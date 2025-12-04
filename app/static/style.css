@@ -1,0 +1,285 @@
+/* ============================================================
+   GLOBAL BASE
+============================================================ */
+
+body {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ============================================================
+   THEME TOGGLE SWITCH
+============================================================ */
+
+:root {
+  --bg: #0f172a;
+  --card-bg: #1e293b;
+  --accent: #38bdf8;
+  --accent-glow: #0ea5e9;
+  --text: #f1f5f9;
+  --muted: #94a3b8;
+  --danger: #ef4444;
+  --success: #22c55e;
+  --radius: 16px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: "Inter", sans-serif;
+}
+
+body {
+  background: inherit;
+  color: inherit;
+  min-height: 100vh;
+  display: block;
+  padding: 0;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.header h1 {
+  font-size: 2rem;
+  letter-spacing: 1px;
+  color: var(--accent);
+  text-shadow: 0 0 8px var(--accent-glow);
+}
+
+.dashboard {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.5rem;
+  width: 100%;
+  max-width: 1200px;
+}
+
+.card {
+  background: var(--card-bg);
+  padding: 1.5rem;
+  border-radius: var(--radius);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+}
+
+.card h2 {
+  color: var(--accent);
+  margin-bottom: 1rem;
+  font-size: 1.2rem;
+  border-bottom: 1px solid var(--accent);
+  padding-bottom: 0.5rem;
+}
+
+ul {
+  list-style: none;
+  line-height: 1.8;
+}
+
+li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+li span {
+  font-weight: bold;
+  color: inherit;
+}
+
+.btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  padding: 0.4rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.btn:hover {
+  background: var(--accent-glow);
+  box-shadow: 0 0 10px var(--accent-glow);
+}
+
+.btn.danger {
+  background: var(--danger);
+}
+
+.btn.primary {
+  background: var(--success);
+}
+
+.slider {
+  width: 100%;
+  margin-top: 1rem;
+  accent-color: var(--accent);
+}
+
+.alarm span {
+  color: var(--danger);
+}
+
+
+
+/* Anthony's code====================================================*/
+.theme-toggle {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 26px;
+  margin-right: 10px;
+}
+
+.theme-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+/*
+.slider { 
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #334155;
+  transition: 0.4s;
+  border-radius: 26px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.4s;
+  border-radius: 50%;
+}
+  
+
+input:checked + .slider {
+  background-color: #3b82f6;
+}
+
+input:checked + .slider:before {
+  transform: translateX(24px);
+}
+  */
+
+/* ============================================================
+   BADGE GLOW (ADMIN / USER)
+============================================================ */
+
+@keyframes glowPulse {
+  0%   { box-shadow: 0 0 4px rgba(0,200,255,0.3); }
+  50%  { box-shadow: 0 0 14px rgba(0,200,255,1); }
+  100% { box-shadow: 0 0 4px rgba(0,200,255,0.3); }
+}
+
+.badge-admin {
+  animation: glowPulse 2s infinite ease-in-out;
+  border-radius: 9999px;
+  border: 1px solid rgba(0,255,160,0.5);
+}
+
+.badge-user {
+  animation: glowPulse 2s infinite ease-in-out;
+  border-radius: 9999px;
+  border: 1px solid rgba(0,200,255,0.5);
+}
+
+/* ============================================================
+   GLOWING ADMIN CONTROL CARD
+============================================================ */
+
+@keyframes adminCardGlow {
+  0%   { box-shadow: 0 0 6px rgba(56,189,248,0.25); }
+  50%  { box-shadow: 0 0 18px rgba(56,189,248,0.95); }
+  100% { box-shadow: 0 0 6px rgba(56,189,248,0.25); }
+}
+
+.glow-card {
+  animation: adminCardGlow 2.5s infinite ease-in-out;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.glow-card:hover {
+  transform: scale(1.02);
+  box-shadow: 0 0 22px rgba(56,189,248,1);
+}
+
+/* Blue variant for System Update card */
+@keyframes adminCardGlowBlue {
+  0%   { box-shadow: 0 0 6px rgba(59,130,246,0.25); }
+  50%  { box-shadow: 0 0 18px rgba(59,130,246,0.95); }
+  100% { box-shadow: 0 0 6px rgba(59,130,246,0.25); }
+}
+
+.glow-card-blue {
+  animation: adminCardGlowBlue 2.5s infinite ease-in-out;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.glow-card-blue:hover {
+  transform: scale(1.02);
+  box-shadow: 0 0 22px rgba(59,130,246,1);
+}
+
+/* ============================================================
+   GLOWING BUTTONS (RESTART / SHUTDOWN / UPDATE)
+============================================================ */
+
+.btn-glow-orange {
+  box-shadow: 0 0 10px rgba(249,115,22,0.6);
+  animation: btnOrangePulse 2s infinite ease-in-out;
+}
+
+.btn-glow-red {
+  box-shadow: 0 0 10px rgba(239,68,68,0.6);
+  animation: btnRedPulse 2s infinite ease-in-out;
+}
+
+.btn-glow-blue {
+  box-shadow: 0 0 10px rgba(59,130,246,0.6);
+  animation: btnBluePulse 2s infinite ease-in-out;
+}
+
+@keyframes btnOrangePulse {
+  0%   { box-shadow: 0 0 6px rgba(249,115,22,0.4); }
+  50%  { box-shadow: 0 0 16px rgba(249,115,22,1); }
+  100% { box-shadow: 0 0 6px rgba(249,115,22,0.4); }
+}
+
+@keyframes btnRedPulse {
+  0%   { box-shadow: 0 0 6px rgba(239,68,68,0.4); }
+  50%  { box-shadow: 0 0 16px rgba(239,68,68,1); }
+  100% { box-shadow: 0 0 6px rgba(239,68,68,0.4); }
+}
+
+@keyframes btnBluePulse {
+  0%   { box-shadow: 0 0 6px rgba(59,130,246,0.4); }
+  50%  { box-shadow: 0 0 16px rgba(59,130,246,1); }
+  100% { box-shadow: 0 0 6px rgba(59,130,246,0.4); }
+}
+
+/* ============================================================
+   COUNTDOWN PROGRESS BAR
+============================================================ */
+
+.progress-bar {
+  transition: width 1s linear;
+}

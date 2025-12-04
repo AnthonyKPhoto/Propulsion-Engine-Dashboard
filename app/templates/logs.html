@@ -1,0 +1,57 @@
+{# Created by Anthony Kaiser #}
+{% extends "layout_dashboard.html" %}
+{% block title %}System Logs{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto mt-10">
+  <h1 class="text-3xl font-bold text-{{ accent }}-400 mb-6">System Logs</h1>
+  <p class="text-slate-400 mb-6">View and download recorded engine/sensor logs.</p>
+
+  <!-- Export Options -->
+  <div class="flex justify-end mb-4 space-x-3">
+    <button id="exportCsv" class="bg-{{ accent }}-600 hover:bg-{{ accent }}-700 text-white px-4 py-2 rounded">
+      Download CSV
+    </button>
+    <button id="exportJson" class="bg-{{ accent }}-600 hover:bg-{{ accent }}-700 text-white px-4 py-2 rounded">
+      Download JSON
+    </button>
+  </div>
+
+  <!-- Charts -->
+  <div class="grid md:grid-cols-2 gap-6 mb-6">
+    <div class="bg-slate-800/80 border border-slate-700 rounded-lg p-4">
+      <h3 class="text-slate-200 font-semibold mb-3">Temperatures (°{{ temp_unit or 'C' }})</h3>
+      <canvas id="chartTemps" height="200"></canvas>
+    </div>
+    <div class="bg-slate-800/80 border border-slate-700 rounded-lg p-4">
+      <h3 class="text-slate-200 font-semibold mb-3">RPM & Thrust</h3>
+      <canvas id="chartRpmThrust" height="200"></canvas>
+    </div>
+  </div>
+
+  <!-- Log Table -->
+  <div class="overflow-x-auto border border-slate-700 rounded-lg">
+    <table id="logsTable" class="min-w-full text-sm text-left text-slate-300">
+      <thead class="bg-slate-800 text-slate-100">
+        <tr>
+          <th class="px-4 py-2">Timestamp</th>
+          <th class="px-4 py-2">Intake (°{{ temp_unit or 'C' }})</th>
+          <th class="px-4 py-2">Exhaust (°{{ temp_unit or 'C' }})</th>
+          <th class="px-4 py-2">RPM</th>
+          <th class="px-4 py-2">Thrust (N)</th>
+          <th class="px-4 py-2">Fuel Flow (kg/s)</th>
+          <th class="px-4 py-2">Status</th>
+        </tr>
+      </thead>
+      <tbody id="logsBody" class="bg-slate-900 divide-y divide-slate-800">
+        <tr><td colspan="7" class="text-center text-slate-500 py-6">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  window.LOG_TEMP_UNIT = "{{ temp_unit or 'C' }}";
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/logs.js') }}"></script>
+{% endblock %}

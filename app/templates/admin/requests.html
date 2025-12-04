@@ -1,0 +1,25 @@
+{% extends "layout_dashboard.html" %}
+{% block content %}
+{% include "admin/_back_to_admin.html" %}
+<h2>Access Requests</h2>
+<h3>Pending</h3>
+<table><tr><th>id</th><th>username</th><th>email</th><th>reason</th><th>created</th><th>actions</th></tr>
+{% for r in pending %}
+<tr>
+  <td>{{ r.id }}</td><td>{{ r.username }}</td><td>{{ r.email }}</td><td>{{ r.reason }}</td>
+  <td>{{ r.created_at }}</td>
+  <td>
+    <form method="post" action="{{ url_for('admin_bp.request_approve', req_id=r.id) }}" style="display:inline"><button>approve</button></form>
+    <form method="post" action="{{ url_for('admin_bp.request_deny', req_id=r.id) }}" style="display:inline"><button>deny</button></form>
+  </td>
+</tr>{% endfor %}</table>
+
+<h3>Recent Decisions</h3>
+<table><tr><th>id</th><th>username</th><th>approved</th><th>approval_time</th><th>temp_pw_shown</th></tr>
+{% for r in decided %}
+<tr>
+  <td>{{ r.id }}</td><td>{{ r.username }}</td><td>{{ r.approved }}</td><td>{{ r.approval_time }}</td><td>{{ r.temp_password_shown }}</td>
+</tr>{% endfor %}</table>
+
+<form method="post" action="{{ url_for('admin_bp.requests_prune_denied') }}"><button>prune denied</button></form>
+{% endblock %}

@@ -1,0 +1,12 @@
+{% extends "layout_dashboard.html" %}
+{% block content %}
+{% include "admin/_back_to_admin.html" %}
+<h2>Security</h2>
+<h3>Fail2Ban</h3>
+<pre>{{ fail2ban }}</pre>
+<h3>UFW</h3>
+<pre>{{ ufw }}</pre>
+<h3>Cert</h3>
+<pre>{{ cert_info|tojson }}</pre>
+<form method="get" action="{{ url_for('admin_bp.logs_view', logname='syslog') }}"><button>view syslog</button></form>
+{% endblock %}

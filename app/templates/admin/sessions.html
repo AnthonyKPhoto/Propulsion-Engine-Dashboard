@@ -1,0 +1,12 @@
+{% extends "layout_dashboard.html" %}
+{% block content %}
+{% include "admin/_back_to_admin.html" %}
+<h2>Sessions</h2>
+<table><tr><th>id</th><th>user</th><th>ip</th><th>ua</th><th>last_seen</th><th>force_logout</th><th>actions</th></tr>
+{% for s in sessions %}
+<tr>
+  <td>{{ s.id }}</td><td>{{ s.user_id }}</td><td>{{ s.ip }}</td><td>{{ s.user_agent }}</td>
+  <td>{{ s.last_seen_at }}</td><td>{{ s.force_logout }}</td>
+  <td><form method="post" action="{{ url_for('admin_bp.sessions_terminate', sid=s.id) }}"><button>terminate</button></form></td>
+</tr>{% endfor %}</table>
+{% endblock %}

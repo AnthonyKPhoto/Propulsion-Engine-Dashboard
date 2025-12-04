@@ -1,0 +1,225 @@
+{% extends "layout_dashboard.html" %}
+{% block title %}System Control{% endblock %}
+
+{% block content %}
+
+{% include "admin/_back_to_admin.html" %}
+
+<h1 class="text-3xl font-bold mb-6 text-sky-400">System Control</h1>
+<p class="text-slate-400 mb-8">Monitor system telemetry and safely restart or shut down the Raspberry Pi.</p>
+
+<!-- ========================================================= -->
+<!-- TELEMETRY CARD (NEW)                                      -->
+<!-- ========================================================= -->
+<div class="mb-10 rounded-xl bg-slate-900/60 border border-slate-700 px-6 py-5 shadow-md">
+  <h2 class="text-xl font-semibold text-sky-400 mb-4">Telemetry &amp; Performance</h2>
+
+  <!-- CPU -->
+  <div class="mb-5">
+    <div class="flex justify-between text-sm text-slate-300 mb-1">
+      <span>CPU Usage</span>
+      <span id="cpuPercentText">–%</span>
+    </div>
+    <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+      <div id="cpuBar" class="h-full bg-sky-500 transition-all duration-300" style="width: 0%;"></div>
+    </div>
+  </div>
+
+  <!-- RAM -->
+  <div class="mb-5">
+    <div class="flex justify-between text-sm text-slate-300 mb-1">
+      <span>RAM Usage</span>
+      <span id="ramPercentText">–%</span>
+    </div>
+    <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+      <div id="ramBar" class="h-full bg-emerald-500 transition-all duration-300" style="width: 0%;"></div>
+    </div>
+  </div>
+
+  <!-- Disk -->
+  <div class="mb-5">
+    <div class="flex justify-between text-sm text-slate-300 mb-1">
+      <span>Disk Usage ( / )</span>
+      <span id="diskPercentText">–%</span>
+    </div>
+    <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+      <div id="diskBar" class="h-full bg-amber-500 transition-all duration-300" style="width: 0%;"></div>
+    </div>
+  </div>
+
+  <!-- CPU Temp -->
+  <div>
+    <div class="flex justify-between text-sm text-slate-300 mb-1">
+      <span>CPU Temperature</span>
+      <span id="cpuTempText">– °C</span>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================================= -->
+<!-- RESTART & SHUTDOWN BUTTONS                                -->
+<!-- ========================================================= -->
+<div class="flex flex-col md:flex-row gap-6">
+
+  <!-- Restart Button -->
+  <div class="w-full md:w-1/2">
+    <button id="restartBtn"
+            class="w-full py-4 bg-orange-600 text-white font-semibold rounded-lg shadow-lg 
+                   hover:bg-orange-500 transition transform hover:scale-[1.02]
+                   animate-pulse-soft-orange">
+      🔄 Restart System
+    </button>
+
+    <div id="restartConfirm" class="hidden mt-4 p-4 bg-orange-900/40 border border-orange-700 rounded-lg">
+      <p class="text-orange-300 font-semibold mb-2">Confirm Restart?</p>
+
+      <div class="flex gap-3">
+        <button id="restartNow"
+                class="flex-1 py-2 bg-orange-600 rounded-lg text-white font-semibold">
+          Yes — Restart
+        </button>
+        <button onclick="cancelAction()"
+                class="flex-1 py-2 bg-slate-700 rounded-lg text-slate-200 font-semibold">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shutdown Button -->
+  <div class="w-full md:w-1/2">
+    <button id="shutdownBtn"
+            class="w-full py-4 bg-red-600 text-white font-semibold rounded-lg shadow-lg 
+                   hover:bg-red-500 transition transform hover:scale-[1.02]
+                   animate-pulse-soft-red">
+      ⛔ Shutdown System
+    </button>
+
+    <div id="shutdownConfirm" class="hidden mt-4 p-4 bg-red-900/40 border border-red-700 rounded-lg">
+      <p class="text-red-300 font-semibold mb-2">Confirm Shutdown? (5s)</p>
+
+      <div id="shutdownCountdown"
+           class="w-full h-2 bg-red-600 rounded-full overflow-hidden mb-3 hidden">
+        <div id="shutdownBar"
+             class="h-full bg-red-400 transition-all duration-[5000ms]"></div>
+      </div>
+
+      <div class="flex gap-3">
+        <button id="shutdownNow"
+                class="flex-1 py-2 bg-red-600 rounded-lg text-white font-semibold">
+          Yes — Shutdown
+        </button>
+        <button onclick="cancelAction()"
+                class="flex-1 py-2 bg-slate-700 rounded-lg text-slate-200 font-semibold">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================================= -->
+<!-- ANIMATIONS                                                -->
+<!-- ========================================================= -->
+<style>
+  @keyframes softPulseOrange {
+      0% { box-shadow: 0 0 6px rgba(255,140,0,0.4); }
+      50% { box-shadow: 0 0 18px rgba(255,140,0,1); }
+      100% { box-shadow: 0 0 6px rgba(255,140,0,0.4); }
+  }
+  .animate-pulse-soft-orange { animation: softPulseOrange 2.2s infinite ease-in-out; }
+
+  @keyframes softPulseRed {
+      0% { box-shadow: 0 0 6px rgba(255,0,0,0.4); }
+      50% { box-shadow: 0 0 18px rgba(255,0,0,1); }
+      100% { box-shadow: 0 0 6px rgba(255,0,0,0.4); }
+  }
+  .animate-pulse-soft-red { animation: softPulseRed 2.2s infinite ease-in-out; }
+</style>
+
+<!-- ========================================================= -->
+<!-- JAVASCRIPT                                                -->
+<!-- ========================================================= -->
+<script>
+  // -------------------------------
+  // Telemetry Polling
+  // -------------------------------
+  async function fetchTelemetry() {
+    try {
+      const response = await fetch("/admin/system/metrics");
+      if (!response.ok) return;
+
+      const data = await response.json();
+
+      const cpu = data.cpu_percent ?? 0;
+      const ram = data.ram_percent ?? 0;
+      const disk = data.disk_percent ?? 0;
+      const temp = data.cpu_temp_c;
+
+      document.getElementById("cpuPercentText").textContent = cpu.toFixed(1) + "%";
+      document.getElementById("cpuBar").style.width = cpu + "%";
+
+      document.getElementById("ramPercentText").textContent = ram.toFixed(1) + "%";
+      document.getElementById("ramBar").style.width = ram + "%";
+
+      document.getElementById("diskPercentText").textContent = disk.toFixed(1) + "%";
+      document.getElementById("diskBar").style.width = disk + "%";
+
+      document.getElementById("cpuTempText").textContent =
+        temp === null ? "N/A" : temp.toFixed(1) + " °C";
+
+    } catch (err) {}
+  }
+
+  document.addEventListener("DOMContentLoaded", fetchTelemetry);
+  setInterval(fetchTelemetry, 1000);
+
+  // Existing Restart/Shutdown Logic
+  const restartBtn = document.getElementById("restartBtn");
+  const shutdownBtn = document.getElementById("shutdownBtn");
+
+  const restartConfirm = document.getElementById("restartConfirm");
+  const shutdownConfirm = document.getElementById("shutdownConfirm");
+
+  const shutdownCountdown = document.getElementById("shutdownCountdown");
+  const shutdownBar = document.getElementById("shutdownBar");
+
+  let countdownTimer = null;
+
+  restartBtn.onclick = () => {
+      restartConfirm.classList.remove("hidden");
+      shutdownConfirm.classList.add("hidden");
+  };
+
+  shutdownBtn.onclick = () => {
+      shutdownConfirm.classList.remove("hidden");
+      restartConfirm.classList.add("hidden");
+  };
+
+  function cancelAction() {
+      restartConfirm.classList.add("hidden");
+      shutdownConfirm.classList.add("hidden");
+
+      shutdownCountdown.classList.add("hidden");
+      shutdownBar.style.width = "100%";
+
+      if (countdownTimer) clearTimeout(countdownTimer);
+  }
+
+  document.getElementById("restartNow").onclick = () => {
+      fetch("/admin/system/restart", { method: "POST" });
+      alert("Restarting system...");
+  };
+
+  document.getElementById("shutdownNow").onclick = () => {
+      shutdownCountdown.classList.remove("hidden");
+      shutdownBar.style.width = "0%";
+
+      countdownTimer = setTimeout(() => {
+        fetch("/admin/system/shutdown", { method: "POST" });
+        alert("System is shutting down...");
+      }, 5000);
+  };
+</script>
+
+{% endblock %}

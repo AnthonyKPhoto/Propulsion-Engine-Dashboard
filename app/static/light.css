@@ -1,0 +1,13 @@
+body, .navbar, .navbar-inner, .content, .container, .card, .table {
+  background-color: #f8f9fa !important;
+  color: #111 !important;
+}
+
+a, .nav-link, .navbar-brand {
+  color: #000 !important;
+}
+
+.table th, .table td {
+  background-color: #fff !important;
+  color: #000 !important;
+}

@@ -1,0 +1,9 @@
+{% extends "layout_dashboard.html" %}
+{% block content %}
+{% include "admin/_back_to_admin.html" %}
+<h2>Login Attempts</h2>
+<table><tr><th>time</th><th>username</th><th>ip</th><th>success</th><th>reason</th></tr>
+{% for a in attempts %}
+<tr><td>{{ a.created_at }}</td><td>{{ a.username }}</td><td>{{ a.ip }}</td><td>{{ a.success }}</td><td>{{ a.reason }}</td></tr>
+{% endfor %}</table>
+{% endblock %}

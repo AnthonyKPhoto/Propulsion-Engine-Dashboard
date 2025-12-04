@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Request Access</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+  <style>
+    body {
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: "Segoe UI", sans-serif;
+      color: #e2e8f0;
+      background: 
+        linear-gradient(rgba(15, 23, 42, 0.85), rgba(15, 23, 42, 0.85)),
+        url('{{ url_for("static", filename="images/login-bg.jpg") }}') center center/cover no-repeat fixed;
+    }
+
+    .access-box {
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid #1e293b;
+      border-radius: 12px;
+      padding: 2rem;
+      width: 380px;
+      text-align: center;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+    }
+
+    h2 {
+      margin-bottom: 1rem;
+      color: #f8fafc;
+    }
+
+    input, textarea {
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0;
+      border: none;
+      border-radius: 8px;
+      background: #1e293b;
+      color: #f8fafc;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      background-color: #2563eb;
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #1d4ed8;
+    }
+
+    a {
+      color: #60a5fa;
+      text-decoration: none;
+      display: inline-block;
+      margin-top: 15px;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .g-recaptcha {
+      margin: 15px 0;
+      display: flex;
+      justify-content: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="access-box">
+    <h2>Request Access</h2>
+    <form method="POST">
+      <input type="text" name="username" placeholder="Desired Username" required />
+      <input type="email" name="email" placeholder="Email Address" required />
+      <textarea name="reason" placeholder="Reason for Access" rows="4" required></textarea>
+
+      <!-- Google reCAPTCHA -->
+      <div class="g-recaptcha" data-sitekey="{{ site_key }}"></div>
+
+      <button type="submit">Submit Request</button>
+    </form>
+    <a href="{{ url_for('auth.login') }}">← Return to Login</a>
+  </div>
+</body>
+</html>

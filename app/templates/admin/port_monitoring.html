@@ -1,0 +1,170 @@
+{% extends "layout_dashboard.html" %}
+{% block title %}Port Monitoring{% endblock %}
+
+{% block content %}
+{% set accent_color = (accent|default('sky')|lower) %}
+{% set card_bg = 'bg-white border-gray-200 text-gray-900' if theme == 'light' else 'bg-slate-900/70 border-slate-700 text-slate-100' %}
+{% set header_border = 'border-gray-200' if theme == 'light' else 'border-slate-700' %}
+{% set table_head = 'bg-gray-100 text-gray-600' if theme == 'light' else 'bg-slate-800/80 text-slate-300' %}
+{% set muted = 'text-gray-600' if theme == 'light' else 'text-slate-400' %}
+{% set body_text = 'text-gray-800' if theme == 'light' else 'text-slate-200' %}
+{% set row_divider = 'divide-gray-200' if theme == 'light' else 'divide-slate-800' %}
+
+{% include "admin/_back_to_admin.html" %}
+
+<h1 class="text-3xl font-bold {% if theme == 'light' %}text-{{ accent_color }}-600{% else %}text-{{ accent_color }}-400{% endif %} mb-2">Port Monitoring</h1>
+<p class="{{ muted }} mb-6">
+  Live view of listening ports, active TCP/UDP connections, and detected serial devices.
+</p>
+
+<!-- CONNECTION TABLE -->
+<div class="mb-6 rounded-xl {{ card_bg }} overflow-hidden">
+
+  <!-- Header -->
+  <div class="px-6 py-3 border-b {{ header_border }} flex justify-between items-center">
+    <h2 class="text-lg font-semibold {% if theme == 'light' %}text-{{ accent_color }}-600{% else %}text-{{ accent_color }}-300{% endif %}">Network Connections</h2>
+    <div class="flex items-center gap-4">
+      <span id="pm-updated" class="text-xs {{ muted }}">Last update: –</span>
+      <label class="flex items-center gap-1 text-xs {{ muted }}">
+        <input type="checkbox" id="pm-auto" class="h-3 w-3 text-{{ accent_color }}-500 rounded">
+        Auto refresh (3s)
+      </label>
+    </div>
+  </div>
+
+  <div class="overflow-x-auto">
+    <table class="min-w-full text-sm text-left {{ body_text }}">
+      <thead class="{{ table_head }} text-xs uppercase">
+        <tr>
+          <th class="px-4 py-2">PID</th>
+          <th class="px-4 py-2">Local</th>
+          <th class="px-4 py-2">Remote</th>
+          <th class="px-4 py-2">Status</th>
+          <th class="px-4 py-2">Listening</th>
+        </tr>
+      </thead>
+      <tbody id="pm-connections" class="divide-y {{ row_divider }}">
+        <!-- JS generated -->
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- SERIAL DEVICES -->
+<div class="rounded-xl {{ card_bg }} px-6 py-4 mt-6">
+  <h2 class="text-lg font-semibold {% if theme == 'light' %}text-{{ accent_color }}-600{% else %}text-{{ accent_color }}-300{% endif %} mb-2">Serial / USB Devices</h2>
+  <p class="{{ muted }} text-sm mb-3">
+    Devices detected under <code class="font-mono text-xs">/dev/ttyUSB*</code>,
+    <code class="font-mono text-xs">/dev/ttyACM*</code>,
+    <code class="font-mono text-xs">/dev/ttyAMA*</code>,
+    <code class="font-mono text-xs">/dev/ttyS*</code>.
+  </p>
+  <ul id="pm-serial" class="text-sm {{ body_text }} list-disc list-inside">
+    <!-- JS injects -->
+  </ul>
+</div>
+
+<script>
+const PM_ACCENT = "{{ accent_color }}";
+const PM_AUTO_KEY = "jet_port_monitor_auto";
+let pmTimer = null;
+
+async function pollPorts() {
+  try {
+    const res = await fetch("{{ url_for('admin_bp.network_ports_json') }}");
+    if (!res.ok) return;
+
+    const data = await res.json();
+    if (data.error) return;
+
+    /* Updated time */
+    const updated = new Date(data.timestamp * 1000);
+    const updEl = document.getElementById("pm-updated");
+    if (updEl) {
+      updEl.textContent = "Last update: " + updated.toLocaleTimeString();
+    }
+
+    /* Connections */
+    const tbody = document.getElementById("pm-connections");
+    tbody.innerHTML = "";
+
+    (data.connections || []).forEach(conn => {
+      const tr = document.createElement("tr");
+
+      const badge = conn.is_listening
+        ? `<span class="px-2 py-0.5 text-xs rounded-full bg-emerald-500/20 text-emerald-300">LISTEN</span>`
+        : `<span class="px-2 py-0.5 text-xs rounded-full bg-${PM_ACCENT}-500/20 text-${PM_ACCENT}-300">${conn.status}</span>`;
+
+      tr.innerHTML = `
+        <td class="px-4 py-2">${conn.pid ?? "–"}</td>
+        <td class="px-4 py-2 font-mono text-xs">${conn.laddr || "–"}</td>
+        <td class="px-4 py-2 font-mono text-xs">${conn.raddr || "–"}</td>
+        <td class="px-4 py-2">${conn.status || "–"}</td>
+        <td class="px-4 py-2">${badge}</td>
+      `;
+
+      tbody.appendChild(tr);
+    });
+
+    /* Serial devices */
+    const serialList = document.getElementById("pm-serial");
+    serialList.innerHTML = "";
+
+    if (data.serial_devices && data.serial_devices.length > 0) {
+      data.serial_devices.forEach(dev => {
+        const li = document.createElement("li");
+        li.textContent = dev;
+        serialList.appendChild(li);
+      });
+    } else {
+      const li = document.createElement("li");
+      li.textContent = "No serial devices detected.";
+      serialList.appendChild(li);
+    }
+
+  } catch (err) {
+    // silent fail
+  }
+}
+
+function startPmAuto() {
+  if (pmTimer) clearInterval(pmTimer);
+  pollPorts();
+  pmTimer = setInterval(pollPorts, 3000); // 3s
+}
+
+function stopPmAuto() {
+  if (pmTimer) {
+    clearInterval(pmTimer);
+    pmTimer = null;
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const chk = document.getElementById("pm-auto");
+  let stored = localStorage.getItem(PM_AUTO_KEY);
+  if (stored === null) {
+    stored = "on"; // default ON
+    localStorage.setItem(PM_AUTO_KEY, "on");
+  }
+  chk.checked = (stored === "on");
+
+  if (chk.checked) {
+    startPmAuto();
+  } else {
+    pollPorts();
+  }
+
+  chk.addEventListener("change", () => {
+    if (chk.checked) {
+      localStorage.setItem(PM_AUTO_KEY, "on");
+      startPmAuto();
+    } else {
+      localStorage.setItem(PM_AUTO_KEY, "off");
+      stopPmAuto();
+    }
+  });
+});
+</script>
+
+{% endblock %}

@@ -1,0 +1,139 @@
+{# Created by Anthony Kaiser #}
+{% extends "layout_dashboard.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto mt-10">
+  <h1 class="text-3xl font-bold text-{{ accent }}-400 mb-6">User Settings</h1>
+
+  <!-- Profile image + upload -->
+  <div class="mb-6 flex items-center gap-4">
+    <img src="{{ url_for('static', filename='profiles/' ~ current_user.profile_image) }}"
+         class="w-20 h-20 rounded-full border border-slate-700 object-cover">
+
+    <div>
+      <p class="text-slate-300 mb-1">
+        Logged in as <span class="font-semibold">{{ current_user.username }}</span>
+      </p>
+      <form action="{{ url_for('settings_bp.upload_profile') }}" method="POST" enctype="multipart/form-data">
+        <label class="block text-sm mb-1">Change Profile Picture</label>
+        <input type="file" name="profile_image" accept="image/*"
+               class="mb-2 text-sm text-slate-300">
+        <button
+          type="submit"
+          class="bg-{{ accent }}-600 hover:bg-{{ accent }}-700 text-white font-medium px-3 py-1 rounded text-sm"
+        >
+          Upload
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Main settings form -->
+  <form method="POST" class="{% if theme == 'light' %}bg-gray-100 border border-gray-300 text-gray-800{% else %}bg-slate-800 border border-slate-700 text-slate-100{% endif %} rounded-lg p-6 shadow">
+
+    <!-- Email -->
+    <label class="block mb-2">Email</label>
+    <input
+      type="email"
+      name="email"
+      value="{{ email or current_user.email or '' }}"
+      class="w-full p-2 mb-4 rounded border {% if theme == 'light' %}border-gray-300 bg-white text-gray-900{% else %}border-slate-700 bg-slate-900 text-slate-100{% endif %}"
+    />
+
+    <!-- Theme -->
+    <label class="block mb-2">Theme</label>
+    <select
+      name="theme"
+      class="w-full p-2 mb-4 rounded border {% if theme == 'light' %}border-gray-300 bg-white text-gray-900{% else %}border-slate-700 bg-slate-900 text-slate-100{% endif %}"
+    >
+      <option value="dark" {% if theme == 'dark' %}selected{% endif %}>Dark</option>
+      <option value="light" {% if theme == 'light' %}selected{% endif %}>Light</option>
+    </select>
+
+    <!-- Accent Color -->
+    <label class="block mb-2">Accent Color</label>
+    <select
+      name="accent"
+      class="w-full p-2 mb-4 rounded border {% if theme == 'light' %}border-gray-300 bg-white text-gray-900{% else %}border-slate-700 bg-slate-900 text-slate-100{% endif %}"
+    >
+      <option value="sky" {% if accent == 'sky' %}selected{% endif %}>Sky Blue</option>
+      <option value="orange" {% if accent == 'orange' %}selected{% endif %}>Orange</option>
+      <option value="emerald" {% if accent == 'emerald' %}selected{% endif %}>Green</option>
+      <option value="rose" {% if accent == 'rose' %}selected{% endif %}>Rose</option>
+    </select>
+
+    <!-- Temperature Unit -->
+    <label class="block mb-2">Temperature Unit</label>
+    <select
+      name="temp_unit"
+      class="w-full p-2 mb-6 rounded border {% if theme == 'light' %}border-gray-300 bg-white text-gray-900{% else %}border-slate-700 bg-slate-900 text-slate-100{% endif %}"
+    >
+      <option value="C" {% if temp_unit == 'C' %}selected{% endif %}>Celsius (°C)</option>
+      <option value="F" {% if temp_unit == 'F' %}selected{% endif %}>Fahrenheit (°F)</option>
+    </select>
+
+    <button
+      type="submit"
+      class="bg-{{ accent }}-600 hover:bg-{{ accent }}-700 text-white font-medium px-4 py-2 rounded w-full"
+    >
+      Save Changes
+    </button>
+  </form>
+
+  <div class="mt-8 border-t border-slate-700 pt-6">
+    <h2 class="text-xl font-semibold text-{{ accent }}-400 mb-3">Account & Security</h2>
+    <a href="{{ url_for('auth.change_password') }}" class="block text-{{ accent }}-400 hover:underline mb-2">
+      Change Password
+    </a>
+  </div>
+
+  <div class="mt-6 bg-slate-800/70 border border-slate-700 rounded-lg p-5 space-y-3">
+    <h3 class="text-lg font-semibold text-{{ accent }}-300 mb-1">Two-Factor Authentication (2FA)</h3>
+    {% if pending_2fa_secret %}
+      <p class="text-sm text-slate-300">Scan this QR with your authenticator app, or enter the secret manually.</p>
+      {% if qr_base64 %}
+        <div class="flex justify-center mb-3">
+          <img src="data:image/png;base64,{{ qr_base64 }}" alt="2FA QR code" class="border border-slate-700 rounded">
+        </div>
+      {% elif qr_supported is defined and not qr_supported %}
+        <p class="text-xs text-amber-300 mb-2">
+          QR generation not available on the server. Enter the secret manually in your authenticator app.
+          {% if qr_error %}Error: {{ qr_error }}{% endif %}
+        </p>
+      {% endif %}
+      <div class="bg-slate-900 border border-slate-700 rounded p-3 font-mono text-slate-100 text-sm break-all">
+        {{ pending_2fa_secret }}
+      </div>
+      <div class="text-xs text-slate-400 break-all">
+        {{ otp_uri }}
+      </div>
+      <form method="POST" class="space-y-2">
+        <input type="hidden" name="action" value="confirm_2fa">
+        <label class="block text-sm text-slate-300">Enter a 6-digit code</label>
+        <input name="totp_code" required inputmode="numeric" autocomplete="one-time-code"
+               class="w-full p-2 rounded border border-slate-600 bg-slate-900 text-slate-100"
+               placeholder="123456">
+        <div class="flex gap-2">
+          <button class="flex-1 bg-{{ accent }}-600 hover:bg-{{ accent }}-500 text-white px-4 py-2 rounded">Confirm & Enable</button>
+          <a href="{{ url_for('settings_bp.settings') }}" class="flex-1 text-center border border-slate-600 text-slate-300 px-4 py-2 rounded">Cancel</a>
+        </div>
+      </form>
+    {% elif current_user.is_2fa_enabled %}
+      <div class="flex items-center justify-between">
+        <p class="text-sm text-emerald-300 font-semibold">2FA is enabled for {{ current_user.username }}</p>
+        <form method="POST">
+          <input type="hidden" name="action" value="disable_2fa">
+          <button class="bg-rose-600 hover:bg-rose-500 text-white px-3 py-1 rounded text-sm">Disable 2FA</button>
+        </form>
+      </div>
+      <p class="text-xs text-slate-400">Use your authenticator app (e.g., Google Authenticator, Authy) to get codes when logging in.</p>
+    {% else %}
+      <p class="text-sm text-slate-300">Protect your account with app-based codes from an authenticator app.</p>
+      <form method="POST">
+        <input type="hidden" name="action" value="start_2fa">
+        <button class="bg-{{ accent }}-600 hover:bg-{{ accent }}-500 text-white px-4 py-2 rounded">Set up 2FA</button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

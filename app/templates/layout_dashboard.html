@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Dashboard{% endblock %}</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+  <style>
+    #sidebar a {
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+    .light-hover:hover { background-color: #e5e7eb; }
+    .dark-hover:hover { background-color: #334155; }
+
+    @keyframes glowPulse {
+      0%   { box-shadow: 0 0 4px rgba(0,200,255,0.3); }
+      50%  { box-shadow: 0 0 14px rgba(0,200,255,1); }
+      100% { box-shadow: 0 0 4px rgba(0,200,255,0.3); }
+    }
+
+    .badge-admin {
+      animation: glowPulse 2s infinite ease-in-out; 
+      border: 1px solid rgba(0,255,160,0.5);
+    }
+
+    .badge-user {
+      animation: glowPulse 2s infinite ease-in-out;
+      border: 1px solid rgba(0,200,255,0.5);
+    }
+  </style>
+</head>
+
+{% set accent_color = accent if accent else 'sky' %}
+
+<body class="{% if theme == 'light' %}bg-gray-100 text-gray-800{% else %}bg-slate-900 text-slate-100{% endif %} min-h-screen">
+
+  {% set current_path = request.path %}
+  {% if current_user.is_authenticated %}
+    {% set profile_image = current_user.profile_image or 'default.png' %}
+  {% else %}
+    {% set profile_image = 'default.png' %}
+  {% endif %}
+
+  <nav class="{% if theme == 'light' %}bg-white border-gray-300 text-gray-900{% else %}bg-slate-800/90 border-slate-700 text-slate-100{% endif %}
+              fixed w-full flex items-center justify-between backdrop-blur px-5 py-3 z-50 border-b">
+
+    <div class="flex items-center">
+      <button id="menu-btn" class="text-{{ accent_color }}-400 text-2xl mr-3 focus:outline-none">☰</button>
+      <span class="text-{{ accent_color }}-400 font-semibold text-lg">
+        Propulsion Jet Dashboard
+      </span>
+    </div>
+
+    <div class="flex items-center gap-4 text-sm">
+      <img src="{{ url_for('static', filename='profiles/' ~ profile_image) }}"
+           class="w-8 h-8 rounded-full border border-slate-600 object-cover">
+
+      <span>
+        Welcome, {{ current_user.username|capitalize }} 👋
+      </span>
+
+      {% if role is defined and role|lower == "admin" %}
+        <span class="px-3 py-1 rounded-full text-xs font-bold bg-green-700/40 text-green-300 badge-admin">
+          ADMIN
+        </span>
+      {% else %}
+        <span class="px-3 py-1 rounded-full text-xs font-bold bg-sky-700/40 text-sky-300 badge-user">
+          USER
+        </span>
+      {% endif %}
+
+      <a href="{{ url_for('auth.logout') }}"
+         class="ml-2 text-{{ accent_color }}-400 hover:underline">
+        Logout
+      </a>
+    </div>
+  </nav>
+
+  <aside id="sidebar"
+         class="{% if theme == 'light' %}bg-gray-200 border-gray-300{% else %}bg-slate-800 border-slate-700{% endif %}
+                fixed top-[56px] left-0 w-60 h-full border-r transform -translate-x-full
+                transition-transform duration-300 z-40">
+
+    <a href="{{ url_for('dashboard.dashboard') }}"
+       class="block px-4 py-3
+              {% if current_path == '/dashboard/' or current_path == '/dashboard' %}
+                bg-{{ accent_color }}-700/30 font-semibold
+              {% endif %}
+              {% if theme == 'light' %}light-hover{% else %}dark-hover{% endif %}
+              text-{{ accent_color }}-400">
+       Dashboard
+    </a>
+
+    <a href="{{ url_for('dashboard.monitoring') }}"
+       class="block px-4 py-3
+              {% if current_path.startswith('/dashboard/monitoring') %}
+                bg-{{ accent_color }}-700/30 font-semibold
+              {% endif %}
+              {% if theme == 'light' %}light-hover{% else %}dark-hover{% endif %}
+              text-{{ accent_color }}-400">
+       Monitoring
+    </a>
+
+    <a href="{{ url_for('dashboard.logs') }}"
+       class="block px-4 py-3
+              {% if current_path.startswith('/dashboard/logs') %}
+                bg-{{ accent_color }}-700/30 font-semibold
+              {% endif %}
+              {% if theme == 'light' %}light-hover{% else %}dark-hover{% endif %}
+              text-{{ accent_color }}-400">
+       Logs
+    </a>
+
+    <a href="{{ url_for('settings_bp.settings') }}"
+       class="block px-4 py-3
+              {% if current_path.startswith('/dashboard/settings') %}
+                bg-{{ accent_color }}-700/30 font-semibold
+              {% endif %}
+              {% if theme == 'light' %}light-hover{% else %}dark-hover{% endif %}
+              text-{{ accent_color }}-400">
+       Settings
+    </a>
+
+    <a href="{{ url_for('admin_bp.admin_verify') }}"
+       class="block px-4 py-3
+              {% if current_path.startswith('/admin') %}
+                bg-{{ accent_color }}-700/30 font-semibold
+              {% endif %}
+              {% if theme == 'light' %}light-hover{% else %}dark-hover{% endif %}
+              text-{{ accent_color }}-400">
+       Admin
+    </a>
+  </aside>
+
+  <div id="overlay" class="fixed inset-0 bg-black/50 hidden z-30"></div>
+
+  <main class="pt-20 px-6 transition-all duration-300" id="main">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="space-y-2 mb-4">
+          {% for category, message in messages %}
+            {% set color = {'success':'emerald','info':'sky','warning':'amber','danger':'rose'}.get(category, 'sky') %}
+            <div class="border border-{{ color }}-700 bg-{{ color }}-900/50 text-{{ color }}-100 px-4 py-3 rounded">
+              {{ message }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const menuBtn = document.getElementById("menu-btn");
+      const sidebar = document.getElementById("sidebar");
+      const overlay = document.getElementById("overlay");
+
+      const toggleSidebar = () => {
+        const isHidden = sidebar.classList.contains("-translate-x-full");
+        sidebar.classList.toggle("-translate-x-full", !isHidden);
+        overlay.classList.toggle("hidden", !isHidden);
+      };
+
+      const closeSidebar = () => {
+        sidebar.classList.add("-translate-x-full");
+        overlay.classList.add("hidden");
+      };
+
+      menuBtn.addEventListener("click", toggleSidebar);
+      overlay.addEventListener("click", closeSidebar);
+    });
+  </script>
+</body>
+</html>

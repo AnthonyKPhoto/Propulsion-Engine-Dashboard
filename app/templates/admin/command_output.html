@@ -1,0 +1,8 @@
+{% extends "layout_dashboard.html" %}
+{% block content %}
+{% include "admin/_back_to_admin.html" %}
+<h2>{{ title }}</h2>
+<p>return code: {{ code }}</p>
+<h3>stdout</h3><pre>{{ out }}</pre>
+<h3>stderr</h3><pre>{{ err }}</pre>
+{% endblock %}

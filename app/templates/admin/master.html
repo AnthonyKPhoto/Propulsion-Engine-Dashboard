@@ -1,0 +1,16 @@
+{% extends 'admin/master.html' %}
+
+{% block head_css %}
+  {{ super() }}
+  {% if session.get('theme') == 'light' %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/light.css') }}">
+  {% else %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dark.css') }}">
+  {% endif %}
+{% endblock %}
+
+{% block body %}
+  <div id="admin-container" class="{{ session.get('theme', 'dark') }}">
+    {{ super() }}
+  </div>
+{% endblock %}

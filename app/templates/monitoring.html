@@ -1,0 +1,517 @@
+{% extends "layout_dashboard.html" %}
+{% block title %}Monitoring{% endblock %}
+{% block content %}
+<style>
+  .tile-veil { background: radial-gradient(circle at 20% 20%, rgba(56,189,248,0.06), transparent 35%), radial-gradient(circle at 80% 0%, rgba(248,113,113,0.08), transparent 30%); }
+  .glow-pill { box-shadow: 0 0 0 1px rgba(14,165,233,0.35), 0 10px 35px rgba(0,0,0,0.35); }
+  .status-chip { transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease; }
+  .metric-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+  .metric-card:hover { transform: translateY(-2px); box-shadow: 0 15px 35px rgba(0,0,0,0.35); }
+  .schematic-bubble { transition: box-shadow 0.3s ease, border-color 0.3s ease; }
+  .schematic-bubble[data-state="danger"] { box-shadow: 0 0 0 3px rgba(248,113,113,0.45), 0 0 25px rgba(248,113,113,0.45); }
+  .schematic-bubble[data-state="warning"] { box-shadow: 0 0 0 3px rgba(251,191,36,0.35), 0 0 18px rgba(251,191,36,0.35); }
+  .schematic-bubble[data-state="normal"] { box-shadow: 0 0 0 2px rgba(52,211,153,0.25); }
+  .sparkline { width: 100%; height: 140px; }
+  .sweep-bg { background: linear-gradient(135deg, rgba(45,212,191,0.14), rgba(56,189,248,0.1), rgba(99,102,241,0.08)); }
+</style>
+
+<div class="max-w-7xl mx-auto space-y-6 pb-10">
+  <div class="flex flex-col gap-4">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div>
+        <p class="text-sm uppercase tracking-[0.3em] {% if theme == 'light' %}text-gray-500{% else %}text-slate-400{% endif %}">Jet Engine</p>
+        <h1 class="text-4xl md:text-5xl font-bold text-{{ accent }}-400 leading-tight">Monitoring & Control</h1>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-xs px-3 py-1 rounded-full border border-{{ accent }}-500/70 text-{{ accent }}-200 glow-pill bg-{{ accent }}-500/10">LIVE</span>
+        <span class="text-xs px-3 py-1 rounded-full border border-emerald-500/70 text-emerald-200 bg-emerald-500/10">100–300 ms refresh</span>
+      </div>
+    </div>
+
+    <!-- Top bar -->
+    <div class="rounded-2xl border tile-veil shadow-xl px-4 py-5 grid grid-cols-1 md:grid-cols-4 gap-4 {% if theme == 'light' %}bg-white border-gray-200{% else %}bg-slate-800/80 border-slate-700{% endif %}">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-500/15 border border-emerald-500/40">
+          <span class="text-xl">🚀</span>
+        </div>
+        <div>
+          <p class="text-xs {% if theme == 'light' %}text-gray-600{% else %}text-slate-400{% endif %}">Engine Status</p>
+          <div id="engine-status" class="status-chip inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-slate-700 text-slate-100 text-sm font-semibold">Idle</div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl flex items-center justify-center bg-amber-500/15 border border-amber-500/40">
+          <span class="text-xl">🎛️</span>
+        </div>
+        <div>
+          <p class="text-xs {% if theme == 'light' %}text-gray-600{% else %}text-slate-400{% endif %}">Current Mode</p>
+          <div id="engine-mode" class="status-chip inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-slate-700 text-slate-100 text-sm font-semibold">Idle</div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl flex items-center justify-center bg-sky-500/15 border border-sky-500/40">
+          <span class="text-xl">🔗</span>
+        </div>
+        <div>
+          <p class="text-xs {% if theme == 'light' %}text-gray-600{% else %}text-slate-400{% endif %}">Connections</p>
+          <div class="flex gap-2 flex-wrap text-xs">
+            <span id="link-esp32" class="status-chip px-2 py-1 rounded bg-slate-700 text-slate-200">ESP32</span>
+            <span id="link-pi" class="status-chip px-2 py-1 rounded bg-slate-700 text-slate-200">Pi Sensors</span>
+            <span id="link-teensy" class="status-chip px-2 py-1 rounded bg-slate-700 text-slate-200">Teensy</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between gap-3">
+        <button id="estop-btn" class="w-full text-white font-bold px-4 py-3 rounded-xl shadow-lg bg-gradient-to-r from-rose-600 to-amber-500 hover:opacity-90">🛑 Emergency Shutdown</button>
+        <button id="fault-reset" class="px-3 py-2 text-xs rounded-lg border border-{{ accent }}-500 text-{{ accent }}-200 hover:bg-{{ accent }}-500/10">Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Critical metrics -->
+  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+    <div class="metric-card rounded-2xl border p-5 sweep-bg {% if theme == 'light' %}bg-white border-gray-200{% else %}bg-slate-800/80 border-slate-700{% endif %}">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <p class="text-xs uppercase tracking-widest {% if theme == 'light' %}text-gray-500{% else %}text-slate-400{% endif %}">Temperatures</p>
+          <h2 class="text-2xl font-semibold text-{{ accent }}-300">Combustion</h2>
+        </div>
+        <span id="state-chamber" class="px-3 py-1 text-xs rounded-full border">normal</span>
+      </div>
+      <div class="space-y-3 text-3xl font-bold">
+        <div class="flex items-center justify-between">
+          <span class="text-xl {% if theme == 'light' %}text-gray-600{% else %}text-slate-300{% endif %}">Chamber</span>
+          <span id="metric-chamber" class="text-emerald-300">0</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-xl {% if theme == 'light' %}text-gray-600{% else %}text-slate-300{% endif %}">Exhaust</span>
+          <span id="metric-exhaust" class="text-emerald-300">0</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-xl {% if theme == 'light' %}text-gray-600{% else %}text-slate-300{% endif %}">Intake</span>
+          <span id="metric-intake" class="text-emerald-300">0</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="metric-card rounded-2xl border p-5 sweep-bg {% if theme == 'light' %}bg-white border-gray-200{% else %}bg-slate-800/80 border-slate-700{% endif %}">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <p class="text-xs uppercase tracking-widest {% if theme == 'light' %}text-gray-500{% else %}text-slate-400{% endif %}">Fuel System</p>
+          <h2 class="text-2xl font-semibold text-{{ accent }}-300">Pressure & Flow</h2>
+        </div>
+        <span id="state-fuel" class="px-3 py-1 text-xs rounded-full border">normal</span>
+      </div>
+      <div class="space-y-3 text-3xl font-bold">
+        <div class="flex items-center justify-between">
+          <span class="text-xl {% if theme == 'light' %}text-gray-600{% else %}text-slate-300{% endif %}">Pressure</span>
+          <span id="metric-pressure" class="text-emerald-300">0</span>
+        </div>
+        <div class="flex items-center justify-between text-xl">
+          <span class="{% if theme == 'light' %}text-gray-600{% else %}text-slate-300{% endif %}">Valve</span>
+          <span id="metric-valve" class="text-{{ accent }}-200 font-semibold">Closed</span>
+        </div>
+        <div class="flex items-center justify-between text-xl">
+          <span class="{% if theme == 'light' %}text-gray-600{% else %}text-slate-300{% endif %}">Flow</span>
+          <span id="metric-flow" class="text-emerald-300 font-semibold">0</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="metric-card rounded-2xl border p-5 sweep-bg {% if theme == 'light' %}bg-white border-gray-200{% else %}bg-slate-800/80 border-slate-700{% endif %}">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <p class="text-xs uppercase tracking-widest {% if theme == 'light' %}text-gray-500{% else %}text-slate-400{% endif %}">Mechanical / Electrical</p>
+          <h2 class="text-2xl font-semibold text-{{ accent }}-300">Drive & Power</h2>
+        </div>
+        <span id="state-rpm" class="px-3 py-1 text-xs rounded-full border">normal</span>
+      </div>
+      <div class="space-y-3 text-3xl font-bold">
+        <div class="flex items-center justify-between">
+          <span class="text-xl {% if theme == 'light' %}text-gray-600{% else %}text-slate-300{% endif %}">RPM</span>
+          <span id="metric-rpm" class="text-emerald-300">0</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-xl {% if theme == 'light' %}text-gray-600{% else %}text-slate-300{% endif %}">Voltage</span>
+          <span id="metric-voltage" class="text-emerald-300">0</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-xl {% if theme == 'light' %}text-gray-600{% else %}text-slate-300{% endif %}">Current</span>
+          <span id="metric-current" class="text-emerald-300">0</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Engine schematic -->
+  <div class="rounded-2xl border shadow-xl p-6 tile-veil {% if theme == 'light' %}bg-white border-gray-200{% else %}bg-slate-800/70 border-slate-700{% endif %}">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <p class="text-xs uppercase tracking-widest {% if theme == 'light' %}text-gray-500{% else %}text-slate-400{% endif %}">Engine state schematic</p>
+        <h3 class="text-2xl font-semibold text-{{ accent }}-300">Flow & Components</h3>
+      </div>
+      <span class="text-xs px-3 py-1 rounded-full border border-slate-600 {% if theme == 'light' %}text-gray-600{% else %}text-slate-300{% endif %}">Tap components for last value</span>
+    </div>
+    <div class="grid grid-cols-1 xl:grid-cols-6 items-center gap-4">
+      <div class="xl:col-span-2 flex items-center gap-3">
+        <div id="schematic-intake" class="schematic-bubble data-tip rounded-xl border px-4 py-3 flex-1 text-center {% if theme == 'light' %}bg-gray-50 border-gray-200{% else %}bg-slate-900/60 border-slate-700{% endif %}" title="Intake temperature">
+          <p class="text-sm {% if theme == 'light' %}text-gray-500{% else %}text-slate-400{% endif %}">Intake</p>
+          <p id="schematic-intake-value" class="text-xl font-semibold">--</p>
+        </div>
+        <div class="h-[3px] flex-1 bg-gradient-to-r from-emerald-400/60 to-sky-400/60 rounded-full"></div>
+      </div>
+
+      <div class="xl:col-span-2 flex flex-col items-center gap-2">
+        <div id="schematic-edf" class="schematic-bubble rounded-full border px-5 py-5 text-center w-full {% if theme == 'light' %}bg-gray-50 border-gray-200{% else %}bg-slate-900/60 border-slate-700{% endif %}" title="EDF / Compressor RPM">
+          <p class="text-sm {% if theme == 'light' %}text-gray-500{% else %}text-slate-400{% endif %}">EDF</p>
+          <p id="schematic-edf-value" class="text-lg font-semibold">--</p>
+        </div>
+        <div class="w-full h-[3px] bg-gradient-to-r from-sky-400/60 to-amber-400/60 rounded-full"></div>
+      </div>
+
+      <div class="xl:col-span-1 flex flex-col gap-2">
+        <div id="schematic-chamber" class="schematic-bubble rounded-xl border px-4 py-4 text-center {% if theme == 'light' %}bg-gray-50 border-gray-200{% else %}bg-slate-900/60 border-slate-700{% endif %}" title="Combustion chamber temp">
+          <p class="text-sm {% if theme == 'light' %}text-gray-500{% else %}text-slate-400{% endif %}">Combustion</p>
+          <p id="schematic-chamber-value" class="text-lg font-semibold">--</p>
+        </div>
+        <div id="schematic-fuel" class="schematic-bubble rounded-xl border px-4 py-3 text-center {% if theme == 'light' %}bg-gray-50 border-gray-200{% else %}bg-slate-900/60 border-slate-700{% endif %}" title="Fuel pressure / valve">
+          <p class="text-sm {% if theme == 'light' %}text-gray-500{% else %}text-slate-400{% endif %}">Fuel</p>
+          <p id="schematic-fuel-value" class="text-lg font-semibold">--</p>
+        </div>
+      </div>
+
+      <div class="xl:col-span-1 flex flex-col items-center gap-2">
+        <div id="schematic-exhaust" class="schematic-bubble rounded-xl border px-4 py-4 text-center {% if theme == 'light' %}bg-gray-50 border-gray-200{% else %}bg-slate-900/60 border-slate-700{% endif %}" title="Exhaust gas temp">
+          <p class="text-sm {% if theme == 'light' %}text-gray-500{% else %}text-slate-400{% endif %}">Exhaust</p>
+          <p id="schematic-exhaust-value" class="text-lg font-semibold">--</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Controls + trends + alerts -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <div class="rounded-2xl border shadow-xl p-5 space-y-4 {% if theme == 'light' %}bg-white border-gray-200{% else %}bg-slate-800/80 border-slate-700{% endif %}">
+      <div class="flex items-center justify-between">
+        <h3 class="text-xl font-semibold text-{{ accent }}-300">Operator Controls</h3>
+        <span class="text-xs px-3 py-1 rounded-full border border-amber-500/70 text-amber-200 bg-amber-500/10">Admin only</span>
+      </div>
+      <div class="space-y-3 text-sm {% if theme == 'light' %}text-gray-600{% else %}text-slate-300{% endif %}">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <p class="font-semibold text-base">Ignition Enable</p>
+            <p class="text-xs opacity-75">Hold before opening fuel</p>
+          </div>
+          <button id="btn-ignition" class="px-4 py-2 rounded-lg bg-slate-700 text-slate-100">Enable</button>
+        </div>
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <p class="font-semibold text-base">Fuel Valve Override</p>
+            <p class="text-xs opacity-75">Manual open/close</p>
+          </div>
+          <button id="btn-fuel" class="px-4 py-2 rounded-lg bg-slate-700 text-slate-100">Open</button>
+        </div>
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="font-semibold text-base">EDF / Compressor</p>
+              <p class="text-xs opacity-75">0–100% power</p>
+            </div>
+            <span id="edf-readout" class="text-lg font-semibold text-{{ accent }}-300">0%</span>
+          </div>
+          <input id="edf-slider" type="range" min="0" max="100" value="0" class="w-full accent-{{ accent }}-400">
+        </div>
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <p class="font-semibold text-base">Logging</p>
+            <p id="log-file" class="text-xs opacity-75 truncate max-w-[160px]">--</p>
+          </div>
+          <button id="btn-logging" class="px-4 py-2 rounded-lg bg-slate-700 text-slate-100">Start</button>
+        </div>
+        <div id="control-lock" class="hidden text-xs text-rose-300 bg-rose-500/10 border border-rose-500/40 rounded-lg px-3 py-2">
+          Safety lock engaged. Clear fault to re-arm controls.
+        </div>
+        {% if role|lower != "admin" %}
+          <div class="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/40 rounded-lg px-3 py-2">
+            Controls are view-only for non-admin users.
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="rounded-2xl border shadow-xl p-5 space-y-4 {% if theme == 'light' %}bg-white border-gray-200{% else %}bg-slate-800/80 border-slate-700{% endif %}">
+      <div class="flex items-center justify-between">
+        <h3 class="text-xl font-semibold text-{{ accent }}-300">Quick Trends (30s)</h3>
+        <span class="text-xs px-3 py-1 rounded-full border border-emerald-500/60 text-emerald-200 bg-emerald-500/10">0.5–1s refresh</span>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <p class="text-xs mb-1 {% if theme == 'light' %}text-gray-600{% else %}text-slate-400{% endif %}">Chamber Temp</p>
+          <canvas id="chart-chamber" class="sparkline"></canvas>
+        </div>
+        <div>
+          <p class="text-xs mb-1 {% if theme == 'light' %}text-gray-600{% else %}text-slate-400{% endif %}">Fuel Pressure</p>
+          <canvas id="chart-fuel" class="sparkline"></canvas>
+        </div>
+        <div>
+          <p class="text-xs mb-1 {% if theme == 'light' %}text-gray-600{% else %}text-slate-400{% endif %}">RPM</p>
+          <canvas id="chart-rpm" class="sparkline"></canvas>
+        </div>
+        <div>
+          <p class="text-xs mb-1 {% if theme == 'light' %}text-gray-600{% else %}text-slate-400{% endif %}">Voltage / Current</p>
+          <canvas id="chart-power" class="sparkline"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="rounded-2xl border shadow-xl p-5 space-y-4 {% if theme == 'light' %}bg-white border-gray-200{% else %}bg-slate-800/80 border-slate-700{% endif %}">
+      <div class="flex items-center justify-between">
+        <h3 class="text-xl font-semibold text-{{ accent }}-300">Alerts & Conditions</h3>
+        <span class="text-xs px-3 py-1 rounded-full border border-slate-600 {% if theme == 'light' %}text-gray-600{% else %}text-slate-300{% endif %}">Auto-clear on stabilize</span>
+      </div>
+      <div id="alert-feed" class="space-y-2 max-h-72 overflow-auto pr-1">
+        <div class="text-sm {% if theme == 'light' %}text-gray-600{% else %}text-slate-400{% endif %}">Waiting for telemetry...</div>
+      </div>
+      <div class="rounded-xl border border-{{ accent }}-500/30 bg-{{ accent }}-500/10 p-3 text-sm">
+        <div class="font-semibold text-{{ accent }}-200 mb-1">Test metadata</div>
+        <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-xs {% if theme == 'light' %}text-gray-700{% else %}text-slate-200{% endif %}">
+          <div><span class="opacity-70">Test ID:</span> <span id="meta-test">--</span></div>
+          <div><span class="opacity-70">Operator:</span> <span id="meta-operator">--</span></div>
+          <div><span class="opacity-70">Engine mode:</span> <span id="meta-mode">--</span></div>
+          <div><span class="opacity-70">Auto-shutdown:</span> <span id="meta-shutdown">--</span></div>
+        </dl>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const csrfToken = "{{ csrf_token }}";
+  const isAdmin = "{{ role|lower }}" === "admin";
+
+  const colors = {
+    normal: { bg: "bg-emerald-500/20", text: "text-emerald-200", border: "border-emerald-500/40" },
+    warning: { bg: "bg-amber-500/20", text: "text-amber-200", border: "border-amber-500/40" },
+    danger: { bg: "bg-rose-500/20", text: "text-rose-200", border: "border-rose-500/40" },
+  };
+
+  const sparkContexts = {
+    chamber: document.getElementById("chart-chamber").getContext("2d"),
+    fuel: document.getElementById("chart-fuel").getContext("2d"),
+    rpm: document.getElementById("chart-rpm").getContext("2d"),
+    power: document.getElementById("chart-power").getContext("2d"),
+  };
+
+  function tintChip(el, state) {
+    if (!el) return;
+    const palette = colors[state] || colors.normal;
+    el.className = `status-chip inline-flex items-center gap-2 px-3 py-1 rounded-lg border text-xs font-semibold ${palette.bg} ${palette.text} ${palette.border}`;
+    el.textContent = state.charAt(0).toUpperCase() + state.slice(1);
+  }
+
+  function setConnection(el, online) {
+    if (!el) return;
+    el.className = `status-chip px-2 py-1 rounded border text-xs ${online ? 'bg-emerald-500/20 text-emerald-200 border-emerald-500/40' : 'bg-rose-500/15 text-rose-200 border-rose-500/30'}`;
+  }
+
+  function updateMetric(el, value, suffix="") {
+    if (el) el.textContent = `${value}${suffix}`;
+  }
+
+  function updateSchematicState(id, value, state) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (!el.dataset.baseClass) el.dataset.baseClass = el.className;
+    const palette = colors[state] || colors.normal;
+    el.className = `${el.dataset.baseClass} ${palette.border} ${palette.bg} ${palette.text}`;
+    el.dataset.state = state;
+  }
+
+  function drawSparkline(ctx, points, color, secondary=null) {
+    ctx.canvas.width = ctx.canvas.clientWidth;
+    ctx.canvas.height = ctx.canvas.clientHeight;
+    const width = ctx.canvas.width;
+    const height = ctx.canvas.height;
+    ctx.clearRect(0,0,width,height);
+    if (!points || !points.length) return;
+    const now = Date.now()/1000;
+    const filtered = points.filter(([t]) => now - t <= 30);
+    if (!filtered.length) return;
+
+    const values = filtered.map(([,v]) => v);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const span = max - min || 1;
+    const step = width / Math.max(filtered.length-1, 1);
+
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = color;
+    ctx.beginPath();
+    filtered.forEach(([t,v], idx) => {
+      const x = idx * step;
+      const y = height - ((v - min) / span) * height;
+      if (idx === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    if (secondary) {
+      ctx.strokeStyle = secondary;
+      ctx.beginPath();
+      filtered.slice(-15).forEach(([t,v], idx) => {
+        const x = (filtered.length-15+idx) * step;
+        const y = height - ((v - min) / span) * height;
+        if (idx === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+    }
+  }
+
+  async function sendControl(action, value) {
+    if (!isAdmin) return;
+    const res = await fetch("/dashboard/api/monitoring/control", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": csrfToken,
+      },
+      body: JSON.stringify({ action, value }),
+    });
+    if (!res.ok) {
+      const msg = await res.text();
+      alert(`Action failed: ${msg}`);
+      return;
+    }
+    return res.json();
+  }
+
+  function renderAlerts(alerts) {
+    const feed = document.getElementById("alert-feed");
+    feed.innerHTML = "";
+    if (!alerts.length) {
+      feed.innerHTML = `<div class="text-sm {% if theme == 'light' %}text-gray-600{% else %}text-slate-400{% endif %}">Stable — no active alerts.</div>`;
+      return;
+    }
+    alerts.slice().reverse().forEach(a => {
+      const palette = colors[a.severity] || colors.normal;
+      const container = document.createElement("div");
+      const ts = new Date(a.ts * 1000).toLocaleTimeString();
+      container.className = `flex items-start gap-2 p-3 rounded-lg border ${palette.border} ${palette.bg} ${palette.text}`;
+      container.innerHTML = `
+        <div class="text-lg">⚠️</div>
+        <div class="flex-1">
+          <div class="text-xs opacity-80">${ts}</div>
+          <div class="font-semibold">${a.text}</div>
+        </div>
+      `;
+      feed.appendChild(container);
+    });
+  }
+
+  async function fetchSnapshot() {
+    const res = await fetch("/dashboard/api/monitoring/snapshot");
+    if (!res.ok) return;
+    const data = await res.json();
+
+    tintChip(document.getElementById("engine-status"), data.engine.status === "fault" ? "danger" : "normal");
+    document.getElementById("engine-status").textContent = data.engine.status.replace("-", " ").toUpperCase();
+    tintChip(document.getElementById("engine-mode"), "normal");
+    document.getElementById("engine-mode").textContent = data.engine.mode;
+
+    setConnection(document.getElementById("link-esp32"), data.connections.esp32);
+    setConnection(document.getElementById("link-pi"), data.connections.pi_sensors);
+    setConnection(document.getElementById("link-teensy"), data.connections.teensy);
+
+    const m = data.metrics;
+    const s = data.metric_states;
+    updateMetric(document.getElementById("metric-chamber"), m.chamber_temp.toFixed(1), " °C");
+    updateMetric(document.getElementById("metric-exhaust"), m.exhaust_temp.toFixed(1), " °C");
+    updateMetric(document.getElementById("metric-intake"), m.intake_temp.toFixed(1), " °C");
+    updateMetric(document.getElementById("metric-pressure"), m.fuel_pressure.toFixed(1), " PSI");
+    updateMetric(document.getElementById("metric-flow"), m.fuel_flow.toFixed(1), " mL/s");
+    updateMetric(document.getElementById("metric-valve"), data.controls.fuel_valve_open ? "Open" : "Closed", "");
+    updateMetric(document.getElementById("metric-rpm"), Math.round(m.rpm).toLocaleString(), " RPM");
+    updateMetric(document.getElementById("metric-voltage"), m.voltage.toFixed(2), " V");
+    updateMetric(document.getElementById("metric-current"), m.current.toFixed(1), " A");
+
+    tintChip(document.getElementById("state-chamber"), s.chamber_temp);
+    tintChip(document.getElementById("state-fuel"), s.fuel_pressure);
+    tintChip(document.getElementById("state-rpm"), s.rpm);
+
+    document.getElementById("schematic-intake-value").textContent = `${m.intake_temp.toFixed(1)} °C`;
+    document.getElementById("schematic-edf-value").textContent = `${Math.round(m.rpm).toLocaleString()} rpm`;
+    document.getElementById("schematic-chamber-value").textContent = `${m.chamber_temp.toFixed(1)} °C`;
+    document.getElementById("schematic-fuel-value").textContent = `${m.fuel_pressure.toFixed(1)} PSI`;
+    document.getElementById("schematic-exhaust-value").textContent = `${m.exhaust_temp.toFixed(1)} °C`;
+
+    updateSchematicState("schematic-intake", m.intake_temp, s.intake_temp || "normal");
+    updateSchematicState("schematic-edf", m.rpm, s.rpm || "normal");
+    updateSchematicState("schematic-chamber", m.chamber_temp, s.chamber_temp);
+    updateSchematicState("schematic-fuel", m.fuel_pressure, s.fuel_pressure);
+    updateSchematicState("schematic-exhaust", m.exhaust_temp, s.exhaust_temp);
+
+    renderAlerts(data.alerts || []);
+
+    document.getElementById("meta-test").textContent = data.metadata.test_id;
+    document.getElementById("meta-operator").textContent = data.metadata.operator || "—";
+    document.getElementById("meta-mode").textContent = data.metadata.engine_mode || data.engine.mode;
+    const shut = data.metadata.auto_shutdown;
+    document.getElementById("meta-shutdown").textContent = `T>${shut.temp}°C | P<${shut.pressure_drop}PSI | RPM>${shut.rpm} | V<${shut.voltage}`;
+
+    if (data.engine.safety_lock) {
+      document.getElementById("control-lock").classList.remove("hidden");
+    } else {
+      document.getElementById("control-lock").classList.add("hidden");
+    }
+
+    document.getElementById("log-file").textContent = data.log_file;
+    document.getElementById("edf-readout").textContent = `${data.controls.edf_power}%`;
+    document.getElementById("edf-slider").value = data.controls.edf_power;
+    document.getElementById("btn-ignition").textContent = data.controls.ignition_enabled ? "Disable" : "Enable";
+    document.getElementById("btn-fuel").textContent = data.controls.fuel_valve_open ? "Close" : "Open";
+    document.getElementById("btn-logging").textContent = data.controls.logging_enabled ? "Stop" : "Start";
+
+    drawSparkline(sparkContexts.chamber, data.trends.chamber_temp, "#22d3ee", "#f87171");
+    drawSparkline(sparkContexts.fuel, data.trends.fuel_pressure, "#34d399", "#fbbf24");
+    drawSparkline(sparkContexts.rpm, data.trends.rpm, "#a78bfa", "#f87171");
+    drawSparkline(sparkContexts.power, data.trends.voltage, "#38bdf8", "#f472b6");
+  }
+
+  function bindControls() {
+    if (!isAdmin) return;
+    document.getElementById("btn-ignition").addEventListener("click", async (e) => {
+      const enable = e.target.textContent.includes("Enable");
+      await sendControl("toggle_ignition", enable);
+    });
+    document.getElementById("btn-fuel").addEventListener("click", async (e) => {
+      const open = e.target.textContent.includes("Open");
+      await sendControl("toggle_fuel_valve", open);
+    });
+    document.getElementById("btn-logging").addEventListener("click", async (e) => {
+      const start = e.target.textContent.includes("Start");
+      await sendControl("set_logging", start);
+    });
+    let sliderTimer = null;
+    document.getElementById("edf-slider").addEventListener("input", (e) => {
+      document.getElementById("edf-readout").textContent = `${e.target.value}%`;
+      clearTimeout(sliderTimer);
+      sliderTimer = setTimeout(() => sendControl("set_edf_power", e.target.value), 200);
+    });
+    document.getElementById("estop-btn").addEventListener("click", async () => {
+      if (!confirm("Confirm EMERGENCY SHUTDOWN?")) return;
+      await sendControl("emergency_shutdown", true);
+    });
+    document.getElementById("fault-reset").addEventListener("click", async () => {
+      await sendControl("clear_fault", true);
+    });
+  }
+
+  bindControls();
+  fetchSnapshot();
+  setInterval(fetchSnapshot, 450);
+</script>
+{% endblock %}

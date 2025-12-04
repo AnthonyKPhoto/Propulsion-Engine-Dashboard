@@ -1,0 +1,10 @@
+.env
+backup.sql
+flask_session/
+venv/
+__pycache__/
+*.pyc
+*.log
+*.pem
+*.key
+*.crt

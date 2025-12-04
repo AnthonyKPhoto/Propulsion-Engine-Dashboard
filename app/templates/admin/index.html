@@ -1,0 +1,727 @@
+{# Created by Anthony Kaiser #}
+{% extends "layout_dashboard.html" %}
+{% block title %}Admin Panel{% endblock %}
+
+{% block content %}
+<div class="space-y-10">
+
+  <!-- Header -->
+  <div>
+    <h1 class="text-3xl font-bold {% if theme == 'light' %}text-{{ accent }}-600{% else %}text-{{ accent }}-400{% endif %} mb-2">
+      Admin Panel
+    </h1>
+    <p class="{% if theme == 'light' %}text-gray-700{% else %}text-slate-400{% endif %}">
+      Manage users, control system operations, and view telemetry and logs.
+    </p>
+  </div>
+
+  {% macro card(title, desc, link='#') %}
+    <a href="{{ link }}"
+       class="block {% if theme == 'light' %}bg-white border-gray-300 hover:bg-gray-100{% else %}
+              bg-slate-800/70 border-slate-700 hover:bg-slate-700/70{% endif %}
+              border rounded-lg p-4 transition">
+    <h3 class="font-semibold {% if theme == 'light' %}text-{{ accent }}-600{% else %}text-{{ accent }}-400{% endif %} mb-2">
+      {{ title }}
+    </h3>
+      <p class="{% if theme == 'light' %}text-gray-700{% else %}text-slate-400{% endif %} text-sm">
+        {{ desc }}
+      </p>
+    </a>
+  {% endmacro %}
+
+  <!-- ===================== USER MGMT ======================= -->
+  <section>
+    <h2 class="text-2xl font-semibold {% if theme == 'light' %}text-{{ accent }}-500{% else %}text-{{ accent }}-300{% endif %} mb-4">
+      User & Access Management
+    </h2>
+    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {{ card("User List & Roles",
+              "View and manage users, roles, and account status.",
+              url_for('admin_bp.users')) }}
+
+      {{ card("Login & Session Logs",
+              "View login attempts, IP addresses, and active sessions.",
+              url_for('admin_bp.logs')) }}
+
+      {{ card("Access Requests",
+              "Review and approve/deny credential requests.",
+              url_for('access.view_requests')) }}
+    </div>
+  </section>
+
+  <!-- ===================== SYSTEM CONTROL ======================= -->
+  <section>
+    <h2 class="text-2xl font-semibold {% if theme == 'light' %}text-{{ accent }}-500{% else %}text-{{ accent }}-300{% endif %} mb-4">
+      System Control
+    </h2>
+
+    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+      <!-- Restart / Shutdown -->
+      <div class="{% if theme == 'light' %}bg-white border-gray-300{% else %}
+                  bg-slate-800/70 border-slate-700{% endif %}
+                  border rounded-lg p-4 shadow-md">
+
+        <h3 class="font-semibold {% if theme == 'light' %}text-{{ accent }}-600{% else %}text-{{ accent }}-400{% endif %} mb-2">
+          Restart / Shutdown
+        </h3>
+
+        <p class="{% if theme == 'light' %}text-gray-700{% else %}text-slate-400{% endif %} text-sm mb-4">
+          Restart the Flask dashboard service or safely shut down the Raspberry Pi system.
+        </p>
+
+        <div class="space-y-3">
+          <button id="restartBtn"
+            class="w-full py-2 bg-orange-600 hover:bg-orange-500 text-white font-semibold rounded-md shadow-md transition">
+            🔄 Restart Dashboard Service
+          </button>
+
+          <button id="shutdownBtn"
+            class="w-full py-2 bg-red-600 hover:bg-red-500 text-white font-semibold rounded-md shadow-md transition">
+            ⛔ Shutdown System
+          </button>
+
+          <div id="confirmBox"
+               class="hidden mt-4 p-3 rounded-md border border-slate-600 bg-slate-800/70">
+            <p id="confirmMessage" class="text-center text-slate-100 mb-3 font-medium"></p>
+            <div id="progressBarWrapper" class="w-full bg-slate-700 rounded-full h-1.5 overflow-hidden mb-2 hidden">
+              <div id="progressBar" class="h-1.5 bg-{{ accent }}-400 progress-bar"></div>
+            </div>
+            <div class="flex gap-3 mt-2">
+              <button id="confirmYes"
+                class="flex-1 py-2 bg-red-600 hover:bg-red-500 text-white rounded-md font-semibold shadow">
+                Confirm
+              </button>
+              <button id="confirmCancel"
+                class="flex-1 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-md font-semibold shadow">
+                Cancel
+              </button>
+            </div>
+            <p id="countdownText" class="text-center text-slate-300 mt-3 text-sm hidden"></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- System Update -->
+      <div class="{% if theme == 'light' %}bg-white border-gray-300{% else %}
+                  bg-slate-800/70 border-slate-700{% endif %}
+                  border rounded-lg p-4 shadow-md">
+        <h3 class="font-semibold {% if theme == 'light' %}text-{{ accent }}-600{% else %}text-{{ accent }}-400{% endif %} mb-2">
+          System Update
+        </h3>
+
+        <p class="{% if theme == 'light' %}text-gray-700{% else %}text-slate-400{% endif %} text-sm mb-4">
+          Run apt update & apt upgrade with live output.
+        </p>
+
+        <button id="updateBtn"
+          class="w-full py-2 bg-{{ accent }}-600 hover:bg-{{ accent }}-500 text-white font-semibold rounded-md shadow-md transition">
+          ⬆️ Run System Update
+        </button>
+
+        <div id="updateConfirmBox"
+             class="hidden mt-4 p-3 rounded-md border border-slate-600 bg-slate-900/70">
+          <p id="updateStatusText" class="text-sm text-slate-200 mb-3">
+            Confirm system update.
+          </p>
+
+          <div class="flex gap-3 mb-3">
+            <button id="updateConfirmYes"
+              class="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-md font-semibold shadow">
+              ✔ Start Update
+            </button>
+            <button id="updateConfirmCancel"
+              class="flex-1 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-md font-semibold shadow">
+              Cancel
+            </button>
+          </div>
+
+          <div id="updateSpinner" class="hidden flex items-center gap-2 mb-2">
+            <div class="w-4 h-4 border-2 border-{{ accent }}-400 border-t-transparent rounded-full animate-spin"></div>
+            <span class="text-xs text-slate-300">Updating…</span>
+          </div>
+
+          <pre id="updateLog"
+               class="mt-2 max-h-56 min-h-[4rem] overflow-y-auto text-xs font-mono bg-slate-950/60
+                      border border-slate-700 rounded p-2 text-slate-200">
+          </pre>
+        </div>
+      </div>
+
+      <!-- Event Log -->
+      <div class="{% if theme == 'light' %}bg-white border-gray-300{% else %}bg-slate-800/70 border-slate-700{% endif %} border rounded-lg p-4 shadow-md transition flex flex-col gap-3">
+        <div class="flex items-center justify-between">
+          <h3 class="font-semibold {% if theme == 'light' %}text-{{ accent }}-600{% else %}text-{{ accent }}-400{% endif %}">
+            Event Log / System Messages
+          </h3>
+          <button id="eventRefresh"
+            class="text-xs px-3 py-1 rounded border border-{{ accent }}-500 text-{{ accent }}-500 hover:bg-{{ accent }}-500/10">
+            Refresh
+          </button>
+        </div>
+        <p class="{% if theme == 'light' %}text-gray-700{% else %}text-slate-400{% endif %} text-sm">
+          Recent events and system messages. Stored in the database for review.
+        </p>
+        <div class="flex gap-2">
+          <input id="eventInput" type="text" placeholder="Add note (optional)"
+                 class="flex-1 px-2 py-1 rounded border {% if theme == 'light' %}border-gray-300 bg-white text-gray-900{% else %}border-slate-700 bg-slate-900 text-slate-100{% endif %}">
+          <button id="eventAdd"
+            class="px-3 py-2 rounded bg-{{ accent }}-600 hover:bg-{{ accent }}-500 text-white text-sm">
+            Add
+          </button>
+        </div>
+        <div id="eventList" class="text-sm space-y-2 max-h-56 overflow-y-auto pr-1">
+          <p class="{% if theme == 'light' %}text-gray-600{% else %}text-slate-400{% endif %} text-xs">Loading events…</p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ===================== TELEMETRY LIVE CARD ======================= -->
+  <section>
+    <h2 class="text-2xl font-semibold text-{{ accent }}-300 mb-4">Live Telemetry</h2>
+
+      <div class="rounded-xl bg-slate-900/60 border border-slate-700 px-6 py-5 shadow-md">
+
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-xl font-semibold text-{{ accent }}-400">System Metrics</h3>
+          <label class="flex items-center gap-2 text-xs text-slate-300">
+            <input type="checkbox" id="telemetryAuto" class="h-3 w-3 text-{{ accent }}-500 rounded">
+            Auto refresh (3s)
+          </label>
+        </div>
+
+      <!-- CPU -->
+      <div class="mb-5">
+        <div class="flex justify-between text-sm text-slate-300 mb-1">
+          <span>CPU Usage</span>
+          <span id="cpuPercentText">–%</span>
+        </div>
+        <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+          <div id="cpuBar" class="h-full bg-{{ accent }}-500 transition-all duration-300" style="width: 0%;"></div>
+        </div>
+      </div>
+
+      <!-- RAM -->
+      <div class="mb-5">
+        <div class="flex justify-between text-sm text-slate-300 mb-1">
+          <span>RAM Usage</span>
+          <span id="ramPercentText">–%</span>
+        </div>
+        <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+          <div id="ramBar" class="h-full bg-emerald-500 transition-all duration-300" style="width: 0%;"></div>
+        </div>
+      </div>
+
+      <!-- Disk -->
+      <div class="mb-5">
+        <div class="flex justify-between text-sm text-slate-300 mb-1">
+          <span>Disk Usage ( / )</span>
+          <span id="diskPercentText">–%</span>
+        </div>
+        <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+          <div id="diskBar" class="h-full bg-amber-500 transition-all duration-300" style="width: 0%;"></div>
+        </div>
+      </div>
+
+      <!-- CPU Temp -->
+      <div>
+        <div class="flex justify-between text-sm text-slate-300 mb-1">
+          <span>CPU Temperature</span>
+          <span id="cpuTempText">– °C</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== NETWORK ======================= -->
+  <section>
+    <h2 class="text-2xl font-semibold text-{{ accent }}-300 mb-4">Device & Network</h2>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+      {{ card("Network Status",
+              "Display IP and interface info.",
+              url_for('admin_bp.network_status_page')) }}
+
+      {{ card("Port Monitoring",
+             "View open ports and serial devices.",
+             url_for('admin_bp.network_ports_page')) }}
+
+    </div>
+  </section>
+
+  <!-- ===================== MAINTENANCE ======================= -->
+  <section>
+    <h2 class="text-2xl font-semibold text-{{ accent }}-300 mb-4">Maintenance & Backup</h2>
+    <div class="grid md:grid-cols-2 gap-4">
+
+      <!-- Backup Download -->
+      <div class="{% if theme == 'light' %}bg-white border border-gray-300{% else %}bg-slate-800/70 border border-slate-700{% endif %} rounded-xl p-4 shadow">
+        <h3 class="font-semibold {% if theme == 'light' %}text-{{ accent }}-600{% else %}text-{{ accent }}-400{% endif %} mb-2">
+          Backup Database
+        </h3>
+        <p class="{% if theme == 'light' %}text-gray-700{% else %}text-slate-400{% endif %} text-sm mb-3">
+          Download a compressed backup of the dashboard database (PostgreSQL).
+        </p>
+        <button id="backupDownloadBtn"
+          class="w-full py-2 bg-{{ accent }}-600 hover:bg-{{ accent }}-500 text-white font-semibold rounded-md shadow transition">
+          ⬇️ Download Backup
+        </button>
+        <p class="text-xs mt-2 {% if theme == 'light' %}text-gray-600{% else %}text-slate-400{% endif %}">
+          Uses <code class="font-mono">pg_dump</code>. Ensure DATABASE_URL is configured and server user has permissions.
+        </p>
+      </div>
+
+      <!-- Restore Upload -->
+      <div class="{% if theme == 'light' %}bg-white border border-gray-300{% else %}bg-slate-800/70 border border-slate-700{% endif %} rounded-xl p-4 shadow">
+        <h3 class="font-semibold {% if theme == 'light' %}text-{{ accent }}-600{% else %}text-{{ accent }}-400{% endif %} mb-2">
+          Restore Database
+        </h3>
+        <p class="{% if theme == 'light' %}text-gray-700{% else %}text-slate-400{% endif %} text-sm mb-3">
+          Upload a <code class="font-mono text-xs">pg_dump</code> file (.dump/.backup) or SQL file to restore.
+        </p>
+        <form id="backupRestoreForm" class="space-y-2">
+          <input type="file" id="backupFile" name="backup_file"
+                 class="w-full text-sm {% if theme == 'light' %}text-gray-700{% else %}text-slate-200{% endif %}" required>
+          <button id="backupRestoreBtn" type="submit"
+            class="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-md shadow transition">
+            ♻️ Restore Backup
+          </button>
+        </form>
+        <p id="backupStatus" class="text-xs mt-2 {% if theme == 'light' %}text-gray-600{% else %}text-slate-400{% endif %}">Idle.</p>
+        <p class="text-[11px] mt-1 {% if theme == 'light' %}text-gray-500{% else %}text-slate-500{% endif %}">
+          WARNING: Restore will overwrite existing data. Ensure you trust the file source.
+        </p>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<!-- ========================================================= -->
+<!-- JAVASCRIPT – TELEMETRY + CONTROL                          -->
+<!-- ========================================================= -->
+<script>
+/* ------------ Telemetry -------------- */
+const TELEMETRY_KEY = "jet_admin_telemetry_auto";
+let telemetryTimer = null;
+
+async function fetchTelemetry() {
+  try {
+    const response = await fetch("{{ url_for('admin_bp.system_metrics') }}");
+    if (!response.ok) return;
+
+    const data = await response.json();
+    if (data.error) return;
+
+    const cpu = data.cpu_percent ?? 0;
+    const ram = data.ram_percent ?? 0;
+    const disk = data.disk_percent ?? 0;
+    const temp = data.cpu_temp_c;
+
+    document.getElementById("cpuPercentText").textContent = cpu.toFixed(1) + "%";
+    document.getElementById("cpuBar").style.width = cpu + "%";
+
+    document.getElementById("ramPercentText").textContent = ram.toFixed(1) + "%";
+    document.getElementById("ramBar").style.width = ram + "%";
+
+    document.getElementById("diskPercentText").textContent = disk.toFixed(1) + "%";
+    document.getElementById("diskBar").style.width = disk + "%";
+
+    const tempUnit = "{{ temp_unit or 'C' }}".toUpperCase();
+    let tempDisplay = "N/A";
+    if (temp !== null && temp !== undefined) {
+      let t = temp;
+      if (tempUnit === "F") {
+        t = (temp * 9/5) + 32;
+      }
+      tempDisplay = t.toFixed(1) + ` °${tempUnit}`;
+    }
+
+    document.getElementById("cpuTempText").textContent = tempDisplay;
+
+  } catch (e) {
+    // silent
+  }
+}
+
+function startTelemetryAuto() {
+  if (telemetryTimer) clearInterval(telemetryTimer);
+  fetchTelemetry();
+  telemetryTimer = setInterval(fetchTelemetry, 3000);
+}
+
+function stopTelemetryAuto() {
+  if (telemetryTimer) {
+    clearInterval(telemetryTimer);
+    telemetryTimer = null;
+  }
+}
+
+/* ------------ Restart / Shutdown + Update ------------ */
+document.addEventListener("DOMContentLoaded", () => {
+  /* Telemetry toggle */
+  const teleChk = document.getElementById("telemetryAuto");
+  let stored = localStorage.getItem(TELEMETRY_KEY);
+  if (stored === null) {
+    stored = "on";
+    localStorage.setItem(TELEMETRY_KEY, "on");
+  }
+  teleChk.checked = (stored === "on");
+  if (teleChk.checked) {
+    startTelemetryAuto();
+  } else {
+    fetchTelemetry();
+  }
+
+  teleChk.addEventListener("change", () => {
+    if (teleChk.checked) {
+      localStorage.setItem(TELEMETRY_KEY, "on");
+      startTelemetryAuto();
+    } else {
+      localStorage.setItem(TELEMETRY_KEY, "off");
+      stopTelemetryAuto();
+    }
+  });
+
+  /* Restart/shutdown */
+  const restartBtn = document.getElementById("restartBtn");
+  const shutdownBtn = document.getElementById("shutdownBtn");
+  const confirmBox = document.getElementById("confirmBox");
+  const confirmMessage = document.getElementById("confirmMessage");
+  const confirmYes = document.getElementById("confirmYes");
+  const confirmCancel = document.getElementById("confirmCancel");
+  const countdownText = document.getElementById("countdownText");
+  const progressBarWrapper = document.getElementById("progressBarWrapper");
+  const progressBar = document.getElementById("progressBar");
+
+  let actionType = null;
+  let countdownTimer = null;
+  const restartUrl = "{{ url_for('admin_bp.restart_pi') }}";
+  const shutdownUrl = "{{ url_for('admin_bp.shutdown_pi') }}";
+
+  function resetState() {
+    if (countdownTimer) clearInterval(countdownTimer);
+    countdownText.classList.add("hidden");
+    progressBarWrapper.classList.add("hidden");
+    progressBar.style.width = "0%";
+    confirmMessage.classList.remove("text-rose-400");
+  }
+
+  function beginConfirm(type) {
+    resetState();
+    actionType = type;
+    confirmMessage.innerText =
+      type === "restart"
+        ? "Restart the Flask dashboard service?"
+        : "Shutdown the Raspberry Pi system?";
+    confirmBox.classList.remove("hidden");
+  }
+
+  if (restartBtn) {
+    restartBtn.addEventListener("click", () => beginConfirm("restart"));
+  }
+  if (shutdownBtn) {
+    shutdownBtn.addEventListener("click", () => beginConfirm("shutdown"));
+  }
+
+  if (confirmCancel) {
+    confirmCancel.addEventListener("click", () => {
+      resetState();
+      confirmBox.classList.add("hidden");
+    });
+  }
+
+  if (confirmYes) {
+    confirmYes.addEventListener("click", () => {
+      let seconds = 5;
+      const totalSeconds = seconds;
+      countdownText.classList.remove("hidden");
+      progressBarWrapper.classList.remove("hidden");
+
+      const actionText =
+        actionType === "restart" ? "Restarting dashboard" : "Shutting down";
+
+      countdownText.innerText = `${actionText} in ${seconds}…`;
+
+      countdownTimer = setInterval(() => {
+        seconds--;
+        const pct = ((totalSeconds - seconds) / totalSeconds) * 100;
+        progressBar.style.width = pct + "%";
+        countdownText.innerText = `${actionText} in ${seconds}…`;
+
+        if (seconds <= 0) {
+          clearInterval(countdownTimer);
+
+          const targetUrl = actionType === "restart" ? restartUrl : shutdownUrl;
+          fetch(targetUrl, {
+            method: "POST",
+            headers: { "X-Requested-With": "XMLHttpRequest" }
+          })
+            .then(async (res) => {
+              let data = null;
+              try {
+                data = await res.json();
+              } catch (_) {}
+
+              if (res.ok && data && data.status === "ok") {
+                const svc = data.service ? ` (${data.service})` : "";
+                confirmMessage.innerText = `Command sent${svc}.`;
+              } else if (!res.ok || (data && data.status === "error")) {
+                const msg =
+                  (data && (data.error || data.message)) ||
+                  `Request failed (${res.status})`;
+                confirmMessage.innerText = msg;
+                confirmMessage.classList.add("text-rose-400");
+              }
+            })
+            .catch(() => {
+              confirmMessage.innerText = "Could not reach server.";
+              confirmMessage.classList.add("text-rose-400");
+            });
+
+          countdownText.innerText =
+            actionType === "restart"
+              ? "Dashboard service restarting…"
+              : "System shutting down…";
+        }
+      }, 1000);
+    });
+  }
+
+  /* System update logic unchanged from before */
+  const updateBtn = document.getElementById("updateBtn");
+  const updateBox = document.getElementById("updateConfirmBox");
+  const updateYes = document.getElementById("updateConfirmYes");
+  const updateCancel = document.getElementById("updateConfirmCancel");
+  const updateStatusText = document.getElementById("updateStatusText");
+  const updateSpinner = document.getElementById("updateSpinner");
+  const updateLog = document.getElementById("updateLog");
+
+  const updateStartUrl = "{{ url_for('admin_bp.system_update_start') }}";
+  const updateStatusUrl = "{{ url_for('admin_bp.system_update_status') }}";
+
+  let updateTimer = null;
+
+  const setUpdateState = (isRunning, message) => {
+    if (isRunning) {
+      updateSpinner.classList.remove("hidden");
+      updateStatusText.textContent = message || "Updating…";
+    } else {
+      updateSpinner.classList.add("hidden");
+      if (message) updateStatusText.textContent = message;
+    }
+  };
+
+  const appendLog = (text) => {
+    updateLog.textContent = text || "";
+    updateLog.scrollTop = updateLog.scrollHeight;
+  };
+
+  const stopUpdatePoll = () => {
+    if (updateTimer) {
+      clearInterval(updateTimer);
+      updateTimer = null;
+    }
+  };
+
+  async function pollUpdateStatus() {
+    try {
+      const res = await fetch(updateStatusUrl, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+      const data = await res.json();
+      appendLog(data.output || "");
+
+      if (data.running) {
+        setUpdateState(true, "Updating…");
+      } else if (data.finished) {
+        if (data.exit_code === 0) {
+          setUpdateState(false, "Update finished successfully.");
+        } else {
+          setUpdateState(false, `Update ended with errors (exit ${data.exit_code}). Check log.`);
+        }
+        stopUpdatePoll();
+      } else {
+        setUpdateState(false, "Idle.");
+      }
+    } catch (err) {
+      stopUpdatePoll();
+      setUpdateState(false, "Could not fetch status.");
+    }
+  }
+
+  if (updateBtn) {
+    updateBtn.addEventListener("click", () => {
+      updateBox.classList.toggle("hidden");
+    });
+  }
+
+  if (updateCancel) {
+    updateCancel.addEventListener("click", () => {
+      stopUpdatePoll();
+      updateBox.classList.add("hidden");
+      setUpdateState(false, "Confirm system update.");
+      appendLog("");
+    });
+  }
+
+  if (updateYes) {
+    updateYes.addEventListener("click", async () => {
+      setUpdateState(true, "Starting update…");
+      appendLog("");
+      try {
+        const res = await fetch(updateStartUrl, {
+          method: "POST",
+          headers: { "X-Requested-With": "XMLHttpRequest" }
+        });
+        const data = await res.json();
+        if (!res.ok || (data && data.error)) {
+          const msg = (data && (data.error || data.message)) || `Request failed (${res.status})`;
+          setUpdateState(false, msg);
+          return;
+        }
+        updateBox.classList.remove("hidden");
+        updateStatusText.textContent = "Update running…";
+        pollUpdateStatus();
+        stopUpdatePoll();
+        updateTimer = setInterval(pollUpdateStatus, 2000);
+      } catch (err) {
+        setUpdateState(false, "Could not start update.");
+      }
+    });
+  }
+
+  if (updateLog) {
+    pollUpdateStatus();
+    stopUpdatePoll();
+    updateTimer = setInterval(pollUpdateStatus, 5000);
+  }
+
+  /* Event log */
+  const eventList = document.getElementById("eventList");
+  const eventRefresh = document.getElementById("eventRefresh");
+  const eventAdd = document.getElementById("eventAdd");
+  const eventInput = document.getElementById("eventInput");
+  const eventsUrl = "{{ url_for('admin_bp.events_recent') }}";
+  const eventsLogUrl = "{{ url_for('admin_bp.events_log') }}";
+
+  async function loadEvents() {
+    if (!eventList) return;
+    try {
+      const res = await fetch(eventsUrl, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        eventList.innerHTML = `<p class="text-xs text-rose-400">${data.error || "Failed to load events."}</p>`;
+        return;
+      }
+      if (!data.events || data.events.length === 0) {
+        eventList.innerHTML = `<p class="text-xs text-slate-400">No events logged yet.</p>`;
+        return;
+      }
+      eventList.innerHTML = data.events.map(ev => {
+        const date = ev.created_at ? new Date(ev.created_at).toLocaleString() : "";
+        return `<div class="border-b border-slate-700/50 pb-1">
+                  <p class="font-semibold text-slate-100 text-sm">${ev.message}</p>
+                  <p class="text-xs text-slate-400">${ev.category || "info"} · ${date}</p>
+                </div>`;
+      }).join("");
+    } catch (err) {
+      eventList.innerHTML = `<p class="text-xs text-rose-400">Could not load events.</p>`;
+    }
+  }
+
+  if (eventRefresh) {
+    eventRefresh.addEventListener("click", loadEvents);
+  }
+
+  if (eventAdd) {
+    eventAdd.addEventListener("click", async () => {
+      const msg = (eventInput && eventInput.value || "").trim();
+      if (!msg) {
+        eventInput.focus();
+        return;
+      }
+      eventAdd.disabled = true;
+      try {
+        const res = await fetch(eventsLogUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Requested-With": "XMLHttpRequest"
+          },
+          body: JSON.stringify({ message: msg, category: "info" })
+        });
+        const data = await res.json();
+        if (res.ok && data.status === "ok") {
+          eventInput.value = "";
+          loadEvents();
+        } else {
+          alert((data && (data.error || data.message)) || "Failed to add event.");
+        }
+      } catch (err) {
+        alert("Could not reach server.");
+      } finally {
+        eventAdd.disabled = false;
+      }
+    });
+  }
+
+  loadEvents();
+
+  /* Backup & Restore */
+  const backupDownloadBtn = document.getElementById("backupDownloadBtn");
+  const backupRestoreForm = document.getElementById("backupRestoreForm");
+  const backupRestoreBtn = document.getElementById("backupRestoreBtn");
+  const backupStatus = document.getElementById("backupStatus");
+  const backupFile = document.getElementById("backupFile");
+
+  const backupDownloadUrl = "{{ url_for('admin_bp.backup_download') }}";
+  const backupRestoreUrl = "{{ url_for('admin_bp.backup_restore') }}";
+
+  if (backupDownloadBtn) {
+    backupDownloadBtn.addEventListener("click", () => {
+      backupStatus.textContent = "Preparing backup…";
+      window.location = backupDownloadUrl;
+      setTimeout(() => (backupStatus.textContent = "If download did not start, ensure pg_dump is available."), 2000);
+    });
+  }
+
+  if (backupRestoreForm) {
+    backupRestoreForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (!backupFile.files.length) {
+        backupStatus.textContent = "Select a backup file first.";
+        return;
+      }
+      backupStatus.textContent = "Uploading and restoring…";
+      backupRestoreBtn.disabled = true;
+      backupRestoreBtn.classList.add("opacity-60", "cursor-not-allowed");
+      const formData = new FormData();
+      formData.append("backup_file", backupFile.files[0]);
+      try {
+        const res = await fetch(backupRestoreUrl, {
+          method: "POST",
+          body: formData,
+          headers: { "X-Requested-With": "XMLHttpRequest" }
+        });
+        const data = await res.json();
+        if (res.ok && data.status === "ok") {
+          backupStatus.textContent = "Restore completed. Consider restarting the service.";
+        } else {
+          backupStatus.textContent =
+            (data && (data.error || data.message)) || `Restore failed (${res.status}). Check server logs.`;
+        }
+      } catch (err) {
+        backupStatus.textContent = "Restore failed: could not reach server.";
+      } finally {
+        backupRestoreBtn.disabled = false;
+        backupRestoreBtn.classList.remove("opacity-60", "cursor-not-allowed");
+      }
+    });
+  }
+
+});
+</script>
+
+{% endblock %}

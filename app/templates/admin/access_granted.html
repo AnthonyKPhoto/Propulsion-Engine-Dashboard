@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Access Granted – Admin Verification</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <script>
+    setTimeout(() => {
+      document.body.classList.add("fade-out");
+      setTimeout(() => {
+        window.location.href = "{{ url_for('admin_bp.admin_panel') }}";
+      }, 600);
+    }, 2500);
+  </script>
+
+  <style>
+    /* Fade-out animation */
+    body {
+      transition: opacity 0.6s ease;
+    }
+    body.fade-out {
+      opacity: 0;
+    }
+
+    /* Spinner */
+    .spinner {
+      width: 34px;
+      height: 34px;
+      border: 4px solid rgba(148,163,184,0.4);
+      border-top-color: #38bdf8;
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+      margin: 0 auto 16px auto;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Pulse glow */
+    @keyframes pulseGlow {
+      0%   { text-shadow: 0 0 6px rgba(34,197,94,0.4); }
+      50%  { text-shadow: 0 0 18px rgba(34,197,94,1); }
+      100% { text-shadow: 0 0 6px rgba(34,197,94,0.4); }
+    }
+    .pulse-text {
+      animation: pulseGlow 1.8s infinite ease-in-out;
+    }
+  </style>
+</head>
+
+<body class="
+      min-h-screen flex items-center justify-center
+      {% if theme == 'light' %}
+        bg-gradient-to-br from-slate-200 via-slate-50 to-slate-200 text-slate-800
+      {% else %}
+        bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-slate-100
+      {% endif %}
+    ">
+
+  <div class="
+      w-[420px] p-8 rounded-2xl shadow-xl backdrop-blur-lg border
+      {% if theme == 'light' %}
+        bg-white/95 border-slate-300
+      {% else %}
+        bg-slate-800/90 border-slate-700
+      {% endif %}
+    ">
+    <div class="mb-4">
+      <a href="{{ url_for('admin_bp.admin_panel') }}" class="inline-flex items-center gap-2 text-sky-400 hover:text-sky-300 font-semibold">
+        <span aria-hidden="true">←</span>
+        <span>Back to Admin Panel</span>
+      </a>
+    </div>
+
+    <div class="spinner"></div>
+
+    <h1 class="text-2xl font-bold text-green-400 mb-3 pulse-text">
+      Access Granted
+    </h1>
+
+    <!-- ROLE BADGE -->
+    <div class="flex justify-center mb-4">
+      {% set r = role if role else 'Admin' %}
+      {% if r|lower == 'admin' %}
+        <span class="px-3 py-1 rounded-full text-xs font-semibold
+          {% if theme == 'light' %} bg-green-200 text-green-700
+          {% else %} bg-green-700/40 text-green-300 {% endif %}
+        ">
+          ADMIN
+        </span>
+      {% else %}
+        <span class="px-3 py-1 rounded-full text-xs font-semibold
+          {% if theme == 'light' %} bg-sky-200 text-sky-700
+          {% else %} bg-sky-700/40 text-sky-300 {% endif %}
+        ">
+          {{ r.upper() }}
+        </span>
+      {% endif %}
+    </div>
+
+    <p class="text-center mb-6
+      {% if theme == 'light' %} text-slate-700
+      {% else %} text-slate-300 {% endif %}
+    ">
+      Administrator status verified.
+      <br>
+      <span class="font-medium
+        {% if theme == 'light' %} text-sky-600
+        {% else %} text-sky-400 {% endif %}
+      ">
+        Redirecting to Admin Panel…
+      </span>
+    </p>
+
+    <a href="{{ url_for('admin_bp.admin_panel') }}"
+       class="inline-block px-6 py-2 rounded-md font-medium text-white
+         {% if theme == 'light' %}
+           bg-sky-600 hover:bg-sky-500
+         {% else %}
+           bg-sky-600 hover:bg-sky-500
+         {% endif %}
+         transition
+       ">
+      Go to Admin Panel Now
+    </a>
+
+  </div>
+
+</body>
+</html>

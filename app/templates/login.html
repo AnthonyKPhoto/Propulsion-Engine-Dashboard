@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login – Propulsion Jet Dashboard</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="icon" href="{{ url_for('static', filename='images/favicon.png') }}">
+  <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+
+  <style>
+    body {
+      background: linear-gradient(165deg, #0f172a 0%, #1e40af 90%);
+      background-image: url("{{ url_for('static', filename='images/login-bg.jpg') }}");
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .pw-toggle-btn {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      cursor: pointer;
+      color: #94a3b8;
+      font-size: 1.1rem;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="w-full max-w-md px-8 py-10 rounded-2xl shadow-2xl border border-slate-700/60 backdrop-blur-lg"
+       style="background: rgba(15, 23, 42, 0.85);">
+
+    <h2 class="text-center text-2xl font-semibold text-sky-400 mb-8">
+      Sign in to Propulsion Dashboard
+    </h2>
+
+    <form method="POST" action="{{ url_for('auth.login') }}" class="space-y-5">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <!-- Username -->
+      <div>
+        <label for="username" class="block mb-1 text-slate-300">Username</label>
+        <input type="text" id="username" name="username"
+               class="w-full px-4 py-2.5 rounded-lg bg-slate-900 border border-slate-600 text-slate-100
+                      focus:ring-2 focus:ring-sky-500 focus:outline-none"
+               placeholder="Username" required>
+      </div>
+
+      <!-- Password w/ eye icon -->
+      <div>
+        <label for="password" class="block mb-1 text-slate-300">Password</label>
+        <div class="relative">
+          <input type="password" id="password" name="password"
+                 class="w-full px-4 py-2.5 pr-12 rounded-lg bg-slate-900 border border-slate-600 text-slate-100
+                        focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                 placeholder="••••••••" required>
+
+          <span class="pw-toggle-btn" onclick="togglePW('password', this)">👁️</span>
+        </div>
+      </div>
+
+      <!-- 2FA Code (if enabled) -->
+      <div>
+        <label for="totp_code" class="block mb-1 text-slate-300">2FA Code (if enabled)</label>
+        <input type="text" id="totp_code" name="totp_code"
+               inputmode="numeric" autocomplete="one-time-code"
+               class="w-full px-4 py-2.5 rounded-lg bg-slate-900 border border-slate-600 text-slate-100
+                      focus:ring-2 focus:ring-sky-500 focus:outline-none"
+               placeholder="123456">
+      </div>
+
+      <!-- CAPTCHA -->
+      <div class="flex justify-center">
+        <div class="g-recaptcha" data-sitekey="{{ site_key }}"></div>
+      </div>
+
+      <!-- Sign In Button -->
+      <button type="submit"
+              class="w-full bg-sky-600 hover:bg-sky-700 text-white font-semibold py-2.5 rounded-lg
+                     transition duration-200 shadow-md">
+        Sign In
+      </button>
+    </form>
+
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="mt-4">
+          {% for category, msg in messages %}
+            <p class="text-center text-sm
+              {% if category == 'danger' %}text-red-400{% else %}text-green-400{% endif %}">
+              {{ msg }}
+            </p>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <!-- Footer -->
+    <div class="text-center mt-6 text-slate-400 text-sm">
+      Need access?
+      <a href="{{ url_for('access.request_access') }}" class="text-sky-400 hover:underline">
+        Request credentials
+      </a>
+      <div class="mt-2">
+        <a href="{{ url_for('auth.forgot_password') }}" class="text-sky-400 hover:underline">
+          Forgot password?
+        </a>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    function togglePW(id, btn) {
+      const input = document.getElementById(id);
+      if (input.type === "password") {
+        input.type = "text";
+        btn.textContent = "🙈";
+      } else {
+        input.type = "password";
+        btn.textContent = "👁️";
+      }
+    }
+  </script>
+</body>
+</html>

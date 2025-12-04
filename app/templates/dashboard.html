@@ -1,0 +1,521 @@
+{% extends "layout_dashboard.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<style>
+@keyframes screenFlash {
+  0%, 100% { background-color: transparent; }
+  25% { background-color: rgba(255, 87, 87, 0.2); }
+  50% { background-color: rgba(255, 157, 0, 0.2); }
+}
+.flash-alert {
+  animation: screenFlash 0.6s ease-in-out 3;
+}
+</style>
+<div class="space-y-8 max-w-5xl mx-auto px-4">
+  <div>
+    <h1 class="text-5xl font-bold text-{{ accent }}-400">Jet Dashboard</h1>
+    <p class="text-lg {% if theme == 'light' %}text-gray-700{% else %}text-slate-300{% endif %}">
+    </p>
+  </div>
+
+  <!-- Top Status Bar -->
+  <div class="rounded-2xl border p-4 shadow-lg flex flex-col gap-3 md:flex-row md:items-center md:justify-between {% if theme == 'light' %}bg-white border-gray-200{% else %}bg-slate-800 border-slate-700{% endif %}">
+    <div class="flex items-center gap-3">
+      <button id="log-toggle"
+        class="px-4 py-2 rounded-full font-semibold text-white bg-emerald-600 hover:bg-emerald-500 shadow">
+        Logs: Enabled
+      </button>
+      <span id="log-dot" class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+      <span class="text-sm {% if theme == 'light' %}text-gray-600{% else %}text-slate-400{% endif %}">Tap to toggle logging</span>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <button id="estop-btn"
+        class="w-full md:w-auto px-6 py-3 rounded-lg text-white font-bold bg-rose-600 hover:bg-rose-500 shadow-lg text-lg">
+        🛑 Emergency Stop
+      </button>
+      <button id="estop-reset"
+        class="px-3 py-2 rounded-lg font-semibold {% if theme == 'light' %}text-gray-700 border border-gray-300 hover:bg-gray-100{% else %}text-slate-200 border border-slate-600 hover:bg-slate-700{% endif %}">
+        Reset
+      </button>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <span class="text-sm {% if theme == 'light' %}text-gray-700{% else %}text-slate-300{% endif %}">System Status</span>
+      <span id="system-status"
+            class="px-3 py-1 rounded-full text-xs font-semibold bg-slate-700 text-slate-100"
+            data-state="idle">
+        Idle
+      </span>
+    <button id="status-cycle"
+      class="text-xs px-3 py-1 rounded border border-{{ accent }}-500 text-{{ accent }}-500 hover:bg-{{ accent }}-500/10">
+      Cycle
+    </button>
+  </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 items-start">
+    <section class="rounded-2xl border p-6 shadow-lg {% if theme == 'light' %}bg-white border-gray-200{% else %}bg-slate-800 border-slate-700{% endif %}">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-2xl font-semibold text-{{ accent }}-400">Telemetry</h2>
+        <span class="text-sm {% if theme == 'light' %}text-gray-500{% else %}text-slate-400{% endif %}"></span>
+      </div>
+      <ul class="space-y-3 text-lg {% if theme == 'light' %}text-gray-800{% else %}text-slate-200{% endif %}">
+        <li class="flex justify-between items-center">
+          <div class="flex items-center gap-2">
+            <span class="inline-block w-2 h-2 rounded-full bg-emerald-500" id="dot-Intake"></span>
+            <span>Intake</span>
+          </div>
+          <span class="font-semibold flex items-center gap-1">
+            <span id="Intake">0</span> <span>°{{ temp_unit or 'C' }}</span>
+          </span>
+        </li>
+        <li class="flex justify-between items-center">
+          <div class="flex items-center gap-2">
+            <span class="inline-block w-2 h-2 rounded-full bg-emerald-500" id="dot-Exhaust"></span>
+            <span>Exhaust</span>
+          </div>
+          <span class="font-semibold flex items-center gap-1">
+            <span id="Exhaust">0</span> <span>°{{ temp_unit or 'C' }}</span>
+          </span>
+        </li>
+        <li class="flex justify-between items-center">
+          <div class="flex items-center gap-2">
+            <span class="inline-block w-2 h-2 rounded-full bg-emerald-500" id="dot-Fuel-Pressure"></span>
+            <span>Fuel Pressure</span>
+          </div>
+          <span class="font-semibold flex items-center gap-1">
+            <span id="Fuel-Pressure">0</span> <span>PSI</span>
+          </span>
+        </li>
+        <li class="flex justify-between items-center">
+          <div class="flex items-center gap-2">
+            <span>Uptime</span>
+            <button id="uptime-reset-btn" class="text-xs px-2 py-1 rounded border border-{{ accent }}-500 text-{{ accent }}-500 hover:bg-{{ accent }}-500/10">
+              Reset
+            </button>
+          </div>
+          <span id="uptime-display" class="font-semibold text-{{ accent }}-400">00:00:00</span>
+        </li>
+      </ul>
+    </section>
+
+    <section class="rounded-2xl border p-6 shadow-lg {% if theme == 'light' %}bg-white border-gray-200{% else %}bg-slate-800 border-slate-700{% endif %}">
+      <h2 class="text-2xl font-semibold text-{{ accent }}-400 mb-4">Controls</h2>
+      <ul class="space-y-3 text-lg {% if theme == 'light' %}text-gray-800{% else %}text-slate-200{% endif %}">
+        <li class="flex justify-between items-center">Ignition <button id="ignition-btn" class="bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded text-base">OFF</button></li>
+        <li class="flex justify-between items-center">Fuel Valve <button id="fuelvalve-btn" class="bg-{{ accent }}-600 hover:bg-{{ accent }}-500 text-white px-4 py-2 rounded text-base">OFF</button></li>
+        <li class="flex justify-between items-center">Starter <button id="starter-btn" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded text-base">START</button></li>
+      </ul>
+    </section>
+
+    <section class="rounded-2xl border p-6 shadow-lg h-full {% if theme == 'light' %}bg-white border-gray-200{% else %}bg-slate-800 border-slate-700{% endif %}">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-2xl font-semibold text-{{ accent }}-400">Fan Speed</h2>
+        <div class="text-sm {% if theme == 'light' %}text-gray-700{% else %}text-slate-300{% endif %}">
+          <span id="Fan" class="font-semibold">0</span> RPM
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <button id="fan-decrease" class="px-3 py-2 rounded border border-{{ accent }}-500 text-{{ accent }}-500 hover:bg-{{ accent }}-500/10">-</button>
+        <input type="range" min="1" max="100" value="50" class="w-full accent-{{ accent }}-500 h-4" id="fanSpeed" />
+        <button id="fan-increase" class="px-3 py-2 rounded border border-{{ accent }}-500 text-{{ accent }}-500 hover:bg-{{ accent }}-500/10">+</button>
+      </div>
+      <div class="flex flex-wrap gap-2 mt-3">
+        <button data-preset="20" class="fan-preset px-3 py-1 rounded border border-{{ accent }}-500 text-{{ accent }}-500 hover:bg-{{ accent }}-500/10 text-xs">Idle</button>
+        <button data-preset="50" class="fan-preset px-3 py-1 rounded border border-{{ accent }}-500 text-{{ accent }}-500 hover:bg-{{ accent }}-500/10 text-xs">Cooling</button>
+        <button data-preset="80" class="fan-preset px-3 py-1 rounded border border-{{ accent }}-500 text-{{ accent }}-500 hover:bg-{{ accent }}-500/10 text-xs">Spin-Up</button>
+      </div>
+    </section>
+
+    <section class="rounded-2xl border p-6 shadow-lg {% if theme == 'light' %}bg-white border-gray-200{% else %}bg-slate-800 border-slate-700{% endif %} xl:col-span-1 xl:col-start-2">
+      <h2 class="text-2xl font-semibold text-{{ accent }}-400 mb-4 text-center">Alarms</h2>
+      <div class="space-y-3 text-lg {% if theme == 'light' %}text-gray-800{% else %}text-slate-200{% endif %} text-center">
+        <div class="flex justify-center items-center gap-2">
+          <span>High Temp Alarm</span>
+          <input id="temperature-input" type="number" value="0"
+                 class="w-24 text-center bg-transparent border border-{{ accent }}-400 rounded px-2 py-1">
+          <span>°{{ temp_unit or 'C' }}</span>
+          <button id="temperature-set" class="px-3 py-1 rounded bg-{{ accent }}-600 hover:bg-{{ accent }}-500 text-white text-sm">Set</button>
+        </div>
+        <div class="flex justify-center items-center gap-2 text-base">
+          <span class="{% if theme == 'light' %}text-gray-700{% else %}text-slate-300{% endif %}">Current:</span>
+          <span id="temperature" class="text-{{ accent }}-400 font-semibold">0</span>
+          <span>°{{ temp_unit or 'C' }}</span>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+  (function() {
+    const logBtn = document.getElementById("log-toggle");
+    const logDot = document.getElementById("log-dot");
+    const estopBtn = document.getElementById("estop-btn");
+    const estopResetBtn = document.getElementById("estop-reset");
+    const statusPill = document.getElementById("system-status");
+    const statusCycle = document.getElementById("status-cycle");
+    const uptimeDisplay = document.getElementById("uptime-display");
+    const uptimeResetBtn = document.getElementById("uptime-reset-btn");
+    const fanRange = document.getElementById("fanSpeed");
+    const fanDisplay = document.getElementById("Fan");
+    const fanIncrease = document.getElementById("fan-increase");
+    const fanDecrease = document.getElementById("fan-decrease");
+    const tempInput = document.getElementById("temperature-input");
+    const tempSetBtn = document.getElementById("temperature-set");
+    const tempDisplay = document.getElementById("temperature");
+    const ignitionBtn = document.getElementById("ignition-btn");
+    const fuelBtn = document.getElementById("fuelvalve-btn");
+    const starterBtn = document.getElementById("starter-btn");
+    const fanPresets = document.querySelectorAll(".fan-preset");
+
+    let logsEnabled = true;
+    const statusOrder = ["idle", "igniting", "live", "fault"];
+    let uptimeTimer = null;
+    let uptimeStart = null;
+    let estopActive = false;
+    let ignitionOn = false;
+    let fuelOn = false;
+    let running = false;
+    let lastLogTimestamp = null;
+    let alarmTriggered = false;
+    let alarmThreshold = parseFloat(tempInput?.value || "0") || 0;
+
+    const statusStyles = {
+      idle:   { text: "Idle", classes: "bg-slate-600 text-slate-100" },
+      igniting: { text: "Igniting", classes: "bg-amber-500 text-white" },
+      live: { text: "Live", classes: "bg-emerald-600 text-white" },
+      fault: { text: "Fault", classes: "bg-rose-600 text-white" },
+    };
+
+    const telemetryDots = {
+      Intake: document.getElementById("dot-Intake"),
+      Exhaust: document.getElementById("dot-Exhaust"),
+      "Fuel-Pressure": document.getElementById("dot-Fuel-Pressure"),
+    };
+
+    const telemetryTimestamps = {};
+
+    function setDotState(key, state) {
+      const dot = telemetryDots[key];
+      if (!dot) return;
+      const cls = {
+        good: "bg-emerald-500",
+        stale: "bg-amber-400",
+        lost: "bg-rose-500",
+      }[state];
+      if (cls) {
+        dot.className = `w-2 h-2 rounded-full ${cls}`;
+      }
+    }
+
+    function markTelemetryUpdate(key) {
+      telemetryTimestamps[key] = Date.now();
+      setDotState(key, "good");
+    }
+
+    function monitorTelemetry() {
+      setInterval(() => {
+        const now = Date.now();
+        Object.keys(telemetryDots).forEach((key) => {
+          const last = telemetryTimestamps[key] || 0;
+          const age = now - last;
+          if (age > 3000) {
+            setDotState(key, "lost");
+          } else if (age > 1000) {
+            setDotState(key, "stale");
+          } else {
+            setDotState(key, "good");
+          }
+        });
+      }, 500);
+    }
+
+    // Mutation observers to detect telemetry updates
+    Object.keys(telemetryDots).forEach((key) => {
+      const el = document.getElementById(key);
+      if (!el) return;
+      markTelemetryUpdate(key);
+      const observer = new MutationObserver(() => markTelemetryUpdate(key));
+      observer.observe(el, { characterData: true, childList: true, subtree: true });
+    });
+    monitorTelemetry();
+
+    function updateLogBtn(forceRed) {
+      if (logsEnabled && !forceRed) {
+        logBtn.textContent = "Logs: Enabled";
+        logBtn.className = "px-4 py-2 rounded-full font-semibold text-white bg-emerald-600 hover:bg-emerald-500 shadow";
+      } else {
+        logBtn.textContent = "Logs: Disabled";
+        logBtn.className = "px-4 py-2 rounded-full font-semibold text-white bg-rose-600 hover:bg-rose-500 shadow";
+      }
+    }
+
+    const logHeartbeatUrl = "{{ url_for('admin_bp.last_log_timestamp') }}";
+
+    function updateLogDotByHeartbeat() {
+      if (!logDot) return;
+      if (!logsEnabled) {
+        logDot.className = "inline-block w-2 h-2 rounded-full bg-rose-500";
+        return;
+      }
+      if (!lastLogTimestamp) {
+        logDot.className = "inline-block w-2 h-2 rounded-full bg-rose-500";
+        return;
+      }
+      const age = Date.now() - lastLogTimestamp;
+      if (age > 6000) {
+        logDot.className = "inline-block w-2 h-2 rounded-full bg-rose-500";
+      } else if (age > 3000) {
+        logDot.className = "inline-block w-2 h-2 rounded-full bg-amber-400";
+      } else {
+        logDot.className = "inline-block w-2 h-2 rounded-full bg-emerald-500";
+      }
+    }
+
+    async function pollLogsHeartbeat() {
+      try {
+        const res = await fetch(logHeartbeatUrl, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+        const data = await res.json();
+        if (data && data.timestamp) {
+          lastLogTimestamp = Date.parse(data.timestamp);
+        }
+      } catch (err) {
+        // ignore
+      } finally {
+        updateLogDotByHeartbeat();
+      }
+    }
+
+    function updateStatus(state) {
+      const info = statusStyles[state] || statusStyles.idle;
+      statusPill.dataset.state = state;
+      statusPill.textContent = info.text;
+      statusPill.className = `px-3 py-1 rounded-full text-xs font-semibold ${info.classes}`;
+      if (state === "igniting" || state === "live") {
+        startUptime();
+      } else {
+        stopUptime();
+      }
+    }
+
+    function refreshStatus() {
+      if (estopActive) {
+        updateStatus("fault");
+        return;
+      }
+      if (running) {
+        updateStatus("live");
+      } else if (ignitionOn || fuelOn) {
+        updateStatus("igniting");
+      } else {
+        updateStatus("idle");
+      }
+    }
+
+    function startUptime() {
+      uptimeStart = uptimeStart || Date.now();
+      if (uptimeTimer) return;
+      uptimeTimer = setInterval(() => {
+        const elapsed = Date.now() - uptimeStart;
+        const totalSeconds = Math.floor(elapsed / 1000);
+        const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, "0");
+        const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, "0");
+        const seconds = String(totalSeconds % 60).padStart(2, "0");
+        uptimeDisplay.textContent = `${hours}:${minutes}:${seconds}`;
+      }, 1000);
+    }
+
+    function stopUptime() {
+      if (uptimeTimer) {
+        clearInterval(uptimeTimer);
+        uptimeTimer = null;
+      }
+    }
+
+    function resetUptime() {
+      stopUptime();
+      uptimeStart = null;
+      if (uptimeDisplay) {
+        uptimeDisplay.textContent = "00:00:00";
+      }
+    }
+
+    if (logBtn) {
+      logBtn.addEventListener("click", () => {
+        logsEnabled = !logsEnabled;
+        updateLogBtn();
+        updateLogDotByHeartbeat();
+      });
+      updateLogBtn();
+    }
+
+    if (statusCycle) {
+      statusCycle.addEventListener("click", () => {
+        const current = statusPill.dataset.state || "idle";
+        const idx = statusOrder.indexOf(current);
+        const next = statusOrder[(idx + 1) % statusOrder.length];
+        updateStatus(next);
+      });
+      updateStatus(statusPill.dataset.state || "idle");
+    }
+
+    if (estopBtn) {
+      estopBtn.addEventListener("click", () => {
+        estopActive = true;
+        estopBtn.textContent = "🛑 STOPPED";
+        estopBtn.classList.add("animate-pulse");
+        updateStatus("fault");
+        resetUptime();
+      });
+    }
+
+    if (estopResetBtn) {
+      estopResetBtn.addEventListener("click", () => {
+        estopActive = false;
+        estopBtn.textContent = "🛑 Emergency Stop";
+        estopBtn.classList.remove("animate-pulse");
+        refreshStatus();
+      });
+    }
+
+    if (uptimeResetBtn) {
+      uptimeResetBtn.addEventListener("click", () => {
+        resetUptime();
+      });
+    }
+
+    function updateFanDisplay(val) {
+      if (fanDisplay) fanDisplay.textContent = val;
+    }
+
+    if (fanRange) {
+      fanRange.addEventListener("input", (e) => {
+        updateFanDisplay(e.target.value);
+      });
+      updateFanDisplay(fanRange.value);
+    }
+
+    if (fanIncrease) {
+      fanIncrease.addEventListener("click", () => {
+        let val = parseInt(fanRange.value || "0", 10);
+        val = Math.min(100, val + 1);
+        fanRange.value = val;
+        updateFanDisplay(val);
+      });
+    }
+
+    if (fanDecrease) {
+      fanDecrease.addEventListener("click", () => {
+        let val = parseInt(fanRange.value || "0", 10);
+        val = Math.max(1, val - 1);
+        fanRange.value = val;
+        updateFanDisplay(val);
+      });
+    }
+
+    if (fanPresets && fanPresets.length) {
+      fanPresets.forEach(btn => {
+        btn.addEventListener("click", () => {
+          const val = parseInt(btn.dataset.preset || "50", 10);
+          if (fanRange) {
+            fanRange.value = val;
+            updateFanDisplay(val);
+          }
+        });
+      });
+    }
+
+    if (tempSetBtn) {
+      tempSetBtn.addEventListener("click", () => {
+        const val = parseFloat(tempInput.value || "0");
+        if (tempDisplay && !Number.isNaN(val)) {
+          tempDisplay.textContent = val;
+        }
+        if (!Number.isNaN(val)) {
+          alarmThreshold = val;
+          alarmTriggered = false;
+          checkTempAlarm();
+        }
+      });
+    }
+
+    if (tempDisplay) {
+      const tempObserver = new MutationObserver(checkTempAlarm);
+      tempObserver.observe(tempDisplay, { characterData: true, childList: true, subtree: true });
+      checkTempAlarm();
+    }
+
+    function triggerAlarm(message) {
+      if (alarmTriggered) return;
+      alarmTriggered = true;
+      document.body.classList.add("flash-alert");
+      setTimeout(() => document.body.classList.remove("flash-alert"), 1200);
+
+      const toast = document.createElement("div");
+      toast.textContent = message || "Alarm triggered";
+      toast.className = "fixed top-4 right-4 bg-rose-600 text-white px-4 py-2 rounded shadow-lg z-50";
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+    }
+
+    function checkTempAlarm() {
+      if (!tempDisplay) return;
+      const current = parseFloat(tempDisplay.textContent || "0");
+      if (Number.isNaN(current)) return;
+      if (current >= alarmThreshold && alarmThreshold > 0) {
+        triggerAlarm("High-temp alarm triggered");
+      } else {
+        alarmTriggered = false;
+      }
+    }
+
+    function toggleButton(btn, isOn, onClasses, offClasses, onText, offText) {
+      if (!btn) return;
+      btn.textContent = isOn ? onText : offText;
+      btn.className = isOn ? onClasses : offClasses;
+    }
+
+    const baseBtn = "px-4 py-2 rounded text-base text-white shadow";
+    const ignitionOnCls = `bg-amber-600 hover:bg-amber-500 ${baseBtn}`;
+    const ignitionOffCls = `bg-rose-600 hover:bg-rose-500 ${baseBtn}`;
+    const fuelOnCls = `bg-emerald-600 hover:bg-emerald-500 ${baseBtn}`;
+    const fuelOffCls = `bg-{{ accent }}-600 hover:bg-{{ accent }}-500 ${baseBtn}`;
+    const starterOnCls = `bg-emerald-600 hover:bg-emerald-500 ${baseBtn}`;
+    const starterOffCls = `bg-emerald-700 hover:bg-emerald-600 ${baseBtn}`;
+
+    if (ignitionBtn) {
+      toggleButton(ignitionBtn, ignitionOn, ignitionOnCls, ignitionOffCls, "ON", "OFF");
+      ignitionBtn.addEventListener("click", () => {
+        ignitionOn = !ignitionOn;
+        toggleButton(ignitionBtn, ignitionOn, ignitionOnCls, ignitionOffCls, "ON", "OFF");
+        if (!ignitionOn) running = false;
+        refreshStatus();
+      });
+    }
+
+    if (fuelBtn) {
+      toggleButton(fuelBtn, fuelOn, fuelOnCls, fuelOffCls, "ON", "OFF");
+      fuelBtn.addEventListener("click", () => {
+        fuelOn = !fuelOn;
+        toggleButton(fuelBtn, fuelOn, fuelOnCls, fuelOffCls, "ON", "OFF");
+        refreshStatus();
+      });
+    }
+
+    if (starterBtn) {
+      toggleButton(starterBtn, running, starterOnCls, starterOffCls, "RUNNING", "START");
+      starterBtn.addEventListener("click", () => {
+        running = !running;
+        toggleButton(starterBtn, running, starterOnCls, starterOffCls, "RUNNING", "START");
+        refreshStatus();
+      });
+    }
+
+    refreshStatus();
+    setInterval(pollLogsHeartbeat, 3000);
+    pollLogsHeartbeat();
+  })();
+</script>
+{% endblock %}

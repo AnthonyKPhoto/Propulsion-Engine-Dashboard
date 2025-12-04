@@ -1,0 +1,227 @@
+{# Created by Anthony Kaiser #}
+{% extends "layout_dashboard.html" %}
+{% block title %}User Management{% endblock %}
+
+{% block content %}
+{% set accent_color = (accent|default('sky')|lower) %}
+{% set card_bg = 'bg-white border-gray-200 text-gray-900' if theme == 'light' else 'bg-slate-900/70 border-slate-700 text-slate-100' %}
+{% set table_head = 'text-gray-600 bg-gray-50' if theme == 'light' else 'text-slate-300 bg-slate-800/70' %}
+{% set table_border = 'border-gray-200' if theme == 'light' else 'border-slate-700' %}
+{% set table_body = 'text-gray-800' if theme == 'light' else 'text-slate-200' %}
+{% set row_divider = 'border-gray-100' if theme == 'light' else 'border-slate-700/50' %}
+{% set modal_panel = 'bg-white border-gray-200 text-gray-900' if theme == 'light' else 'bg-slate-800 border-slate-700 text-slate-100' %}
+{% set input_styles = 'w-full p-2 rounded border transition focus:outline-none focus:ring-2 focus:ring-' ~ accent_color ~ '-400 ' ~ ('bg-gray-50 border-gray-200 text-gray-900' if theme == 'light' else 'bg-slate-900 border-slate-700 text-slate-100') %}
+{% set muted_text = 'text-gray-600' if theme == 'light' else 'text-slate-400' %}
+
+{% include "admin/_back_to_admin.html" %}
+
+<div class="flex items-center justify-between mb-6">
+    <h1 class="text-3xl font-bold {% if theme == 'light' %}text-{{ accent_color }}-600{% else %}text-{{ accent_color }}-400{% endif %}">User List & Access Control</h1>
+    <button class="bg-{{ accent_color }}-600 hover:bg-{{ accent_color }}-500 text-white px-4 py-2 rounded shadow"
+            onclick="openAddUserModal()">
+        + Add User
+    </button>
+ </div>
+
+{% if temp_pw %}
+<div class="mb-4 px-4 py-3 rounded border {% if theme == 'light' %}border-emerald-200 bg-emerald-50 text-emerald-800{% else %}border-emerald-700 bg-emerald-900/60 text-emerald-100{% endif %}">
+    <p class="font-semibold">Temporary password generated:</p>
+    <p class="font-mono text-lg mt-1">{{ temp_pw }}</p>
+    <p class="text-sm mt-1 {% if theme == 'light' %}text-emerald-700{% else %}text-emerald-200{% endif %}">Share this with the user. They will be forced to change it on first login.</p>
+</div>
+{% endif %}
+
+<div class="{{ card_bg }} rounded-lg p-6 shadow-lg">
+
+    <table class="w-full text-left">
+        <thead class="{{ table_head }} border-b {{ table_border }}">
+            <tr>
+                <th class="py-2 text-sm uppercase tracking-wide">ID</th>
+                <th class="text-sm uppercase tracking-wide">Username</th>
+                <th class="text-sm uppercase tracking-wide">Email</th>
+                <th class="text-sm uppercase tracking-wide">Role</th>
+                <th class="text-sm uppercase tracking-wide">Approved</th>
+                <th class="text-sm uppercase tracking-wide">Actions</th>
+            </tr>
+        </thead>
+
+        <tbody class="{{ table_body }}">
+            {% for u in users %}
+            <tr class="border-b {{ row_divider }}">
+                <td class="py-2">{{ u.id }}</td>
+                <td>{{ u.username }}</td>
+                <td>{{ u.email or "N/A" }}</td>
+
+                <td class="font-bold">
+                    {% if theme == 'light' %}
+                        <span class="px-2 py-1 rounded-full text-xs {% if u.role == 'admin' %}bg-emerald-100 text-emerald-700{% else %}bg-{{ accent_color }}-100 text-{{ accent_color }}-700{% endif %}">
+                            {{ u.role }}
+                        </span>
+                    {% else %}
+                        <span class="px-2 py-1 rounded-full text-xs {% if u.role == 'admin' %}bg-emerald-900/40 text-emerald-200{% else %}bg-{{ accent_color }}-900/40 text-{{ accent_color }}-200{% endif %}">
+                            {{ u.role }}
+                        </span>
+                    {% endif %}
+                </td>
+
+                <td>
+                    {% if u.is_approved %}
+                      <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold {% if theme == 'light' %}bg-emerald-100 text-emerald-700{% else %}bg-emerald-900/40 text-emerald-200{% endif %}">✔ Yes</span>
+                    {% else %}
+                      <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold {% if theme == 'light' %}bg-amber-100 text-amber-700{% else %}bg-amber-900/40 text-amber-200{% endif %}">⏳ Pending</span>
+                    {% endif %}
+                </td>
+
+                <td class="space-x-2">
+
+                    <!-- Change Username -->
+                    <button class="text-{{ accent_color }}-500 underline"
+                        onclick="openEditModal('change_username', {{ u.id }}, '{{ u.username|escape }}')">
+                        Username
+                    </button>
+
+                    <!-- Change Email -->
+                    <button class="text-{{ accent_color }}-500 underline"
+                        onclick="openEditModal('change_email', {{ u.id }}, '{{ u.email|default('', true)|escape }}')">
+                        Email
+                    </button>
+
+                    <!-- Toggle Role -->
+                    <button class="text-orange-500 underline"
+                        onclick="openConfirmModal('toggle_role', {{ u.id }}, 'Toggle role for {{ u.username }}?')">
+                        Role
+                    </button>
+
+                    <!-- Reset Password -->
+                    <button class="text-yellow-500 underline"
+                        onclick="openConfirmModal('reset_pw', {{ u.id }}, 'Reset password for {{ u.username }}?')">
+                        Reset
+                    </button>
+
+                    <!-- Delete User -->
+                    <button class="text-red-400 underline"
+                        onclick="openConfirmModal('delete', {{ u.id }}, 'Delete {{ u.username }}? This cannot be undone!')">
+                        Delete
+                    </button>
+
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+
+    </table>
+
+</div>
+
+
+<!-- EDIT MODAL -->
+<div id="edit-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center">
+    <form method="POST" class="{{ modal_panel }} p-6 rounded shadow w-96">
+        <h2 id="edit-title" class="text-xl mb-3 {% if theme == 'light' %}text-{{ accent_color }}-600{% else %}text-{{ accent_color }}-400{% endif %}"></h2>
+
+        <input type="hidden" name="action" id="edit-action">
+        <input type="hidden" name="user_id" id="edit-user-id">
+
+        <label id="edit-label" class="block mb-2"></label>
+        <input name="new_value" id="edit-input" class="{{ input_styles }} mb-4">
+
+        <button class="bg-{{ accent_color }}-600 hover:bg-{{ accent_color }}-500 px-4 py-2 rounded text-white w-full">Save</button>
+        <button type="button" onclick="closeAllModals()" class="mt-3 {{ muted_text }} underline w-full">Cancel</button>
+    </form>
+</div>
+
+
+<!-- CONFIRM MODAL -->
+<div id="confirm-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center">
+    <form method="POST" class="{{ modal_panel }} p-6 rounded shadow w-96">
+        <h2 class="text-xl mb-3 {% if theme == 'light' %}text-rose-600{% else %}text-rose-400{% endif %}">Confirm Action</h2>
+
+        <p id="confirm-text" class="mb-4"></p>
+
+        <input type="hidden" name="action" id="confirm-action">
+        <input type="hidden" name="user_id" id="confirm-user-id">
+
+        <button class="bg-rose-600 hover:bg-rose-500 px-4 py-2 rounded text-white w-full">Confirm</button>
+        <button type="button" onclick="closeAllModals()" class="mt-3 {{ muted_text }} underline w-full">Cancel</button>
+    </form>
+</div>
+
+<!-- ADD USER MODAL -->
+<div id="add-user-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center">
+    <form method="POST" class="{{ modal_panel }} p-6 rounded shadow w-96 space-y-3">
+        <h2 class="text-xl font-semibold {% if theme == 'light' %}text-{{ accent_color }}-600{% else %}text-{{ accent_color }}-400{% endif %}">Add New User</h2>
+        <input type="hidden" name="action" value="create_user">
+
+        <label class="block text-sm {{ muted_text }}">Username</label>
+        <input name="new_username" required class="{{ input_styles }}" minlength="3" maxlength="32">
+
+        <label class="block text-sm {{ muted_text }}">Email (optional)</label>
+        <input name="new_email" type="email" class="{{ input_styles }}">
+
+        <label class="block text-sm {{ muted_text }}">Role</label>
+        <select name="new_role" class="{{ input_styles }}">
+            <option value="user" selected>User</option>
+            <option value="admin">Admin</option>
+        </select>
+
+        <p class="text-xs {{ muted_text }}">A temporary password will be generated (emailed if an address is provided) and shown after saving. The user will be forced to change it on first login.</p>
+
+        <button class="bg-{{ accent_color }}-600 hover:bg-{{ accent_color }}-500 px-4 py-2 rounded text-white w-full">Create User</button>
+        <button type="button" onclick="closeAllModals()" class="mt-1 {{ muted_text }} underline w-full">Cancel</button>
+    </form>
+</div>
+
+
+
+<script>
+function closeAllModals() {
+    document.getElementById("edit-modal").classList.add("hidden");
+    document.getElementById("confirm-modal").classList.add("hidden");
+    document.getElementById("add-user-modal").classList.add("hidden");
+}
+
+
+/* ========= OPEN EDIT MODAL (Username / Email) ========= */
+function openEditModal(action, id, value) {
+    closeAllModals();
+
+    const modal = document.getElementById("edit-modal");
+    const title = document.getElementById("edit-title");
+    const label = document.getElementById("edit-label");
+    const input = document.getElementById("edit-input");
+
+    document.getElementById("edit-action").value = action;
+    document.getElementById("edit-user-id").value = id;
+
+    if (action === "change_username") {
+        title.innerText = "Change Username";
+        label.innerText = "New Username";
+    } else {
+        title.innerText = "Change Email";
+        label.innerText = "New Email";
+    }
+
+    input.value = value || "";
+    modal.classList.remove("hidden");
+}
+
+
+/* ========= OPEN CONFIRM MODAL (role, reset, delete, approve) ========= */
+function openConfirmModal(action, id, text) {
+    closeAllModals();
+
+    document.getElementById("confirm-action").value = action;
+    document.getElementById("confirm-user-id").value = id;
+    document.getElementById("confirm-text").innerText = text;
+
+    document.getElementById("confirm-modal").classList.remove("hidden");
+}
+
+/* ========= OPEN ADD USER MODAL ========= */
+function openAddUserModal() {
+    closeAllModals();
+    document.getElementById("add-user-modal").classList.remove("hidden");
+}
+</script>
+
+{% endblock %}

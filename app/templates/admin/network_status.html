@@ -1,0 +1,158 @@
+{% extends "layout_dashboard.html" %}
+{% block title %}Network Status{% endblock %}
+
+{% block content %}
+{% set accent_color = (accent|default('sky')|lower) %}
+{% set card_bg = 'bg-white border-gray-200 text-gray-900' if theme == 'light' else 'bg-slate-900/70 border-slate-700 text-slate-100' %}
+{% set header_border = 'border-gray-200' if theme == 'light' else 'border-slate-700' %}
+{% set muted = 'text-gray-600' if theme == 'light' else 'text-slate-400' %}
+{% set body_text = 'text-gray-800' if theme == 'light' else 'text-slate-200' %}
+
+{% include "admin/_back_to_admin.html" %}
+
+<h1 class="text-3xl font-bold {% if theme == 'light' %}text-{{ accent_color }}-600{% else %}text-{{ accent_color }}-400{% endif %} mb-2">Network Status</h1>
+<p class="{{ muted }} mb-6">
+  Live view of network interfaces, IP addresses, MAC addresses, gateway, and DNS configuration.
+</p>
+
+<!-- NETWORK CARD -->
+<div class="rounded-xl {{ card_bg }} overflow-hidden">
+  
+  <!-- Header -->
+  <div class="px-6 py-3 border-b {{ header_border }} flex justify-between items-center">
+    <h2 class="text-lg font-semibold {% if theme == 'light' %}text-{{ accent_color }}-600{% else %}text-{{ accent_color }}-300{% endif %}">Interface Details</h2>
+    <div class="flex items-center gap-4">
+      <span id="ns-updated" class="text-xs {{ muted }}">Last update: –</span>
+      <label class="flex items-center gap-1 text-xs {{ muted }}">
+        <input type="checkbox" id="ns-auto" class="h-3 w-3 text-{{ accent_color }}-500 rounded">
+        Auto refresh (3s)
+      </label>
+    </div>
+  </div>
+
+  <div id="ns-container" class="p-6 text-sm {{ body_text }} space-y-4">
+    <!-- JS injects interface blocks -->
+  </div>
+
+  <!-- Gateway -->
+  <div class="px-6 py-3 border-t {{ header_border }}">
+    <h2 class="text-lg font-semibold {% if theme == 'light' %}text-{{ accent_color }}-600{% else %}text-{{ accent_color }}-300{% endif %} mb-1">Gateway</h2>
+    <p id="ns-gw" class="{{ muted }} text-sm">–</p>
+  </div>
+
+  <!-- DNS -->
+  <div class="px-6 py-3 border-t {{ header_border }}">
+    <h2 class="text-lg font-semibold {% if theme == 'light' %}text-{{ accent_color }}-600{% else %}text-{{ accent_color }}-300{% endif %} mb-1">DNS Servers</h2>
+    <ul id="ns-dns" class="list-disc list-inside {{ muted }} text-sm">
+      <!-- JS injects -->
+    </ul>
+  </div>
+</div>
+
+<script>
+const NS_ACCENT = "{{ accent_color }}";
+const NS_AUTO_KEY = "jet_network_status_auto";
+let nsTimer = null;
+
+async function pollNetworkStatus() {
+  try {
+    const res = await fetch("{{ url_for('admin_bp.network_status_json') }}");
+    if (!res.ok) return;
+
+    const data = await res.json();
+    if (data.error) return;
+
+    /* Last update */
+    const updated = new Date(data.timestamp * 1000);
+    const updatedEl = document.getElementById("ns-updated");
+    if (updatedEl) {
+      updatedEl.textContent = "Last update: " + updated.toLocaleTimeString();
+    }
+
+    /* Interfaces */
+    const container = document.getElementById("ns-container");
+    container.innerHTML = "";
+
+    for (const [iface, info] of Object.entries(data.interfaces || {})) {
+      const div = document.createElement("div");
+      div.className = "border {{ 'border-gray-200 bg-gray-50' if theme == 'light' else 'border-slate-700 bg-slate-800/50' }} rounded-lg p-4";
+
+      div.innerHTML = `
+        <h3 class="text-${NS_ACCENT}-500 font-semibold mb-2">${iface}</h3>
+        <p><strong class="text-${NS_ACCENT}-400">Status:</strong> ${info.up ? "UP" : "DOWN"}</p>
+        <p><strong class="text-${NS_ACCENT}-400">IPv4:</strong> ${info.ipv4 || "–"}</p>
+        <p><strong class="text-${NS_ACCENT}-400">IPv6:</strong> ${info.ipv6 || "–"}</p>
+        <p><strong class="text-${NS_ACCENT}-400">MAC:</strong> ${info.mac || "–"}</p>
+      `;
+
+      container.appendChild(div);
+    }
+
+    /* Gateway */
+    const gwEl = document.getElementById("ns-gw");
+    if (gwEl) {
+      gwEl.textContent = data.gateway || "No default gateway detected.";
+    }
+
+    /* DNS servers */
+    const dnsList = document.getElementById("ns-dns");
+    dnsList.innerHTML = "";
+
+    if (data.dns && data.dns.length) {
+      data.dns.forEach(ip => {
+        const li = document.createElement("li");
+        li.textContent = ip;
+        dnsList.appendChild(li);
+      });
+    } else {
+      const li = document.createElement("li");
+      li.textContent = "No DNS servers detected.";
+      dnsList.appendChild(li);
+    }
+
+  } catch (err) {
+    // silent fail
+  }
+}
+
+function startNsAuto() {
+  if (nsTimer) clearInterval(nsTimer);
+  pollNetworkStatus();
+  nsTimer = setInterval(pollNetworkStatus, 3000); // 3s
+}
+
+function stopNsAuto() {
+  if (nsTimer) {
+    clearInterval(nsTimer);
+    nsTimer = null;
+  }
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+  const chk = document.getElementById("ns-auto");
+  let stored = localStorage.getItem(NS_AUTO_KEY);
+  if (stored === null) {
+    stored = "on"; // default ON
+    localStorage.setItem(NS_AUTO_KEY, "on");
+  }
+  chk.checked = (stored === "on");
+
+  if (chk.checked) {
+    startNsAuto();
+  } else {
+    pollNetworkStatus();
+  }
+
+  chk.addEventListener("change", () => {
+    if (chk.checked) {
+      localStorage.setItem(NS_AUTO_KEY, "on");
+      startNsAuto();
+    } else {
+      localStorage.setItem(NS_AUTO_KEY, "off");
+      stopNsAuto();
+    }
+  });
+});
+</script>
+
+{% endblock %}

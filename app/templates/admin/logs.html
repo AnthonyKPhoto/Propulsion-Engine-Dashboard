@@ -1,0 +1,85 @@
+{# Created by Anthony Kaiser #}
+{% extends "layout_dashboard.html" %}
+{% block title %}Login & Session Logs{% endblock %}
+
+{% block content %}
+{% set accent_color = (accent|default('sky')|lower) %}
+{% set card_bg = 'bg-white border-gray-200 text-gray-900' if theme == 'light' else 'bg-slate-800/80 border-slate-700 text-slate-100' %}
+{% set header_text = 'text-' ~ accent_color ~ '-600' if theme == 'light' else 'text-' ~ accent_color ~ '-400' %}
+{% set muted = 'text-gray-600' if theme == 'light' else 'text-slate-400' %}
+{% set table_head = 'bg-gray-100 border-gray-200 text-gray-700' if theme == 'light' else 'bg-slate-900/70 border-slate-700 text-slate-300' %}
+{% set row_hover = 'hover:bg-gray-50' if theme == 'light' else 'hover:bg-slate-700/50' %}
+{% set body_text = 'text-gray-800' if theme == 'light' else 'text-slate-200' %}
+
+<div class="p-8">
+  {% include "admin/_back_to_admin.html" %}
+  <h1 class="text-2xl font-semibold {{ header_text }} mb-6">Login & Session Logs</h1>
+
+  <div class="{{ card_bg }} rounded-2xl p-6 shadow-xl backdrop-blur-md">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold {{ header_text }}">Recent Login Attempts</h2>
+      <button id="autoRefreshBtn"
+              class="text-xs px-3 py-1 rounded border border-{{ accent_color }}-600 {{ header_text }} hover:bg-{{ accent_color }}-100 hover:text-{{ accent_color }}-700 {% if theme != 'light' %}hover:bg-{{ accent_color }}-600/20{% endif %}">
+        Auto refresh: Off
+      </button>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm {{ body_text }}">
+        <thead class="{{ table_head }} border-b">
+          <tr>
+            <th class="py-3 px-4 text-left">Username</th>
+            <th class="py-3 px-4 text-left">IP Address</th>
+            <th class="py-3 px-4 text-left">Timestamp</th>
+            <th class="py-3 px-4 text-left">Status</th>
+            <th class="py-3 px-4 text-left">User Agent</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in logs %}
+          <tr class="{{ row_hover }} transition">
+            <td class="py-2 px-4 font-medium">{{ log.username }}</td>
+            <td class="py-2 px-4">{{ log.ip }}</td>
+            <td class="py-2 px-4">{{ log.timestamp_est or '—' }}</td>
+            <td class="py-2 px-4">
+              {% set ok = log.status == 'success' %}
+              <span class="{% if ok %}text-green-400{% else %}text-rose-300{% endif %} font-medium">
+                {{ log.status.replace('_', ' ')|title }}
+              </span>
+            </td>
+            <td class="py-2 px-4 {{ muted }} max-w-xs truncate" title="{{ log.user_agent }}">{{ log.user_agent }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if not logs %}
+    <p class="text-center {{ muted }} mt-4">No login activity recorded.</p>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+  (() => {
+    const btn = document.getElementById("autoRefreshBtn");
+    let timer = null;
+    const intervalMs = 10000; // 10s
+
+    const updateLabel = () => {
+      btn.textContent = `Auto refresh: ${timer ? "On" : "Off"}`;
+      btn.classList.toggle("bg-sky-600/30", !!timer);
+    };
+
+    btn.addEventListener("click", () => {
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      } else {
+        timer = setInterval(() => window.location.reload(), intervalMs);
+      }
+      updateLabel();
+    });
+  })();
+</script>
+{% endblock %}
