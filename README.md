@@ -11,6 +11,7 @@ This project is being developed as part of a senior design project at Capitol Te
 - **Anthony Kaiser**
 - **Rayel Tiomela**
 - **Gordon Montrose**
+- **Oluwatobi Awobayikun**
 - **Newton Devaraj**
 
 
