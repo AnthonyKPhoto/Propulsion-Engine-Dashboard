@@ -82,6 +82,4 @@ High-level architecture:
   - Development: `flask run` or `python wsgi.py`.
   - Production: Gunicorn bound to `127.0.0.1:5000` behind Nginx with Let’s Encrypt TLS.
 
-> Adjust this section to match your exact microcontroller model, wiring, and dependencies.
-
 ---
