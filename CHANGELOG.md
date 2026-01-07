@@ -3,6 +3,36 @@ All major changes to this project are recorded here.
 
 ---
 
+## [1.4.0] – 2025-01-06
+### Added
+- 3-tier RBAC (Viewer / Operator / Admin) with normalized roles and updated role badges.
+- Authentication and authorization audit logging for:
+  - Login / logout
+  - Registration
+  - Password changes and resets
+  - 2FA enable / disable
+  - Settings and profile updates
+  - Admin verification actions
+- “Commanded vs Actual” state indicators for ignition, fuel, starter, and fan.
+- Emergency Stop banner with control lockout and clear **FAULT** status indication.
+- Alarm status badges (Armed / Triggered).
+- Telemetry offline indicators using `--` placeholders.
+- Fan preset active-mode highlighting.
+- Restyled **Request Access** page to match site UI, including CSRF token support.
+
+### Changed
+- Monitoring controls restricted to Operator and Admin roles; Viewers receive explicit permission-denied messaging.
+- Role changes restricted to Admin only (UI and server-side enforcement).
+- Settings and profile pages restricted to Admin only.
+- Hardened session handling with idle timeout and secure cookie settings.
+- Control order updated (Starter → Fuel → Ignition) with improved label and button spacing.
+- Fuel Pressure label and value layout aligned with other telemetry rows.
+
+### Fixed
+- Viewer permissions now fully block all dashboard control interactions with a clear alert message.
+
+---
+
 ## [1.3.0] – 2025-02-16
 ### Added
 - Monitoring page concept for quick-view runtime metrics.
