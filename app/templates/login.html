@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login – Propulsion Jet Dashboard</title>
+  <title>Login – Hybrid Turbojet Dashboard</title>
 
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="icon" href="{{ url_for('static', filename='images/favicon.png') }}">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
   <script src="https://www.google.com/recaptcha/api.js" async defer></script>
 
   <style>
@@ -40,7 +40,7 @@
        style="background: rgba(15, 23, 42, 0.85);">
 
     <h2 class="text-center text-2xl font-semibold text-sky-400 mb-8">
-      Sign in to Propulsion Dashboard
+      Sign in to Hybrid Turbojet Dashboard
     </h2>
 
     <form method="POST" action="{{ url_for('auth.login') }}" class="space-y-5">

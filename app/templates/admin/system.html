@@ -73,6 +73,13 @@
     <div id="restartConfirm" class="hidden mt-4 p-4 bg-orange-900/40 border border-orange-700 rounded-lg">
       <p class="text-orange-300 font-semibold mb-2">Confirm Restart?</p>
 
+      <div id="restartCountdown" class="w-full h-2 bg-orange-600 rounded-full overflow-hidden mb-3 hidden">
+        <div id="restartBar" class="h-full bg-orange-300 transition-all duration-[5000ms]"></div>
+      </div>
+      <div id="restartCountdownText" class="hidden text-sm text-orange-200 mb-2">
+        Restarting in <span id="restartSeconds">5</span>s...
+      </div>
+
       <div class="flex gap-3">
         <button id="restartNow"
                 class="flex-1 py-2 bg-orange-600 rounded-lg text-white font-semibold">
@@ -102,6 +109,9 @@
            class="w-full h-2 bg-red-600 rounded-full overflow-hidden mb-3 hidden">
         <div id="shutdownBar"
              class="h-full bg-red-400 transition-all duration-[5000ms]"></div>
+      </div>
+      <div id="shutdownCountdownText" class="hidden text-sm text-red-200 mb-2">
+        Shutting down in <span id="shutdownSeconds">5</span>s...
       </div>
 
       <div class="flex gap-3">
@@ -136,6 +146,8 @@
   }
   .animate-pulse-soft-red { animation: softPulseRed 2.2s infinite ease-in-out; }
 </style>
+
+<div id="actionStatus" class="mt-4 text-sm text-slate-200 hidden"></div>
 
 <!-- ========================================================= -->
 <!-- JAVASCRIPT                                                -->
@@ -174,52 +186,166 @@
   document.addEventListener("DOMContentLoaded", fetchTelemetry);
   setInterval(fetchTelemetry, 1000);
 
-  // Existing Restart/Shutdown Logic
+  // Existing Restart/Shutdown Logic (enhanced with countdown + auto-refresh)
   const restartBtn = document.getElementById("restartBtn");
   const shutdownBtn = document.getElementById("shutdownBtn");
 
   const restartConfirm = document.getElementById("restartConfirm");
   const shutdownConfirm = document.getElementById("shutdownConfirm");
 
+  const restartCountdown = document.getElementById("restartCountdown");
+  const restartCountdownText = document.getElementById("restartCountdownText");
+  const restartSeconds = document.getElementById("restartSeconds");
+  const restartBar = document.getElementById("restartBar");
+
   const shutdownCountdown = document.getElementById("shutdownCountdown");
+  const shutdownCountdownText = document.getElementById("shutdownCountdownText");
+  const shutdownSeconds = document.getElementById("shutdownSeconds");
   const shutdownBar = document.getElementById("shutdownBar");
 
+  const actionStatus = document.getElementById("actionStatus");
+
   let countdownTimer = null;
+  let countdownTicker = null;
 
   restartBtn.onclick = () => {
       restartConfirm.classList.remove("hidden");
       shutdownConfirm.classList.add("hidden");
+
+      hideCountdowns();
+      resetStatus();
   };
 
   shutdownBtn.onclick = () => {
       shutdownConfirm.classList.remove("hidden");
       restartConfirm.classList.add("hidden");
+
+      hideCountdowns();
+      resetStatus();
   };
 
-  function cancelAction() {
-      restartConfirm.classList.add("hidden");
-      shutdownConfirm.classList.add("hidden");
-
-      shutdownCountdown.classList.add("hidden");
-      shutdownBar.style.width = "100%";
-
-      if (countdownTimer) clearTimeout(countdownTimer);
+  function resetStatus() {
+      if (!actionStatus) return;
+      actionStatus.classList.add("hidden");
+      actionStatus.textContent = "";
+      actionStatus.classList.remove("text-green-300", "text-red-300", "text-slate-200");
   }
 
-  document.getElementById("restartNow").onclick = () => {
-      fetch("/admin/system/restart", { method: "POST" });
-      alert("Restarting system...");
-  };
+  function setStatus(msg, tone = "info") {
+      if (!actionStatus) return;
+      actionStatus.classList.remove("text-green-300", "text-red-300", "text-slate-200", "hidden");
+      if (tone === "success") actionStatus.classList.add("text-green-300");
+      else if (tone === "error") actionStatus.classList.add("text-red-300");
+      else actionStatus.classList.add("text-slate-200");
+      actionStatus.textContent = msg;
+  }
 
-  document.getElementById("shutdownNow").onclick = () => {
-      shutdownCountdown.classList.remove("hidden");
-      shutdownBar.style.width = "0%";
+  function resetTimers() {
+      if (countdownTimer) {
+          clearTimeout(countdownTimer);
+          countdownTimer = null;
+      }
+      if (countdownTicker) {
+          clearInterval(countdownTicker);
+          countdownTicker = null;
+      }
+  }
 
-      countdownTimer = setTimeout(() => {
-        fetch("/admin/system/shutdown", { method: "POST" });
-        alert("System is shutting down...");
+  function hideCountdowns() {
+      restartCountdown.classList.add("hidden");
+      restartCountdownText.classList.add("hidden");
+      shutdownCountdown.classList.add("hidden");
+      shutdownCountdownText.classList.add("hidden");
+
+      restartBar.style.width = "100%";
+      shutdownBar.style.width = "100%";
+  }
+
+  function cancelAction() {
+      resetTimers();
+      hideCountdowns();
+      restartConfirm.classList.add("hidden");
+      shutdownConfirm.classList.add("hidden");
+      resetStatus();
+  }
+
+  async function postAction(actionType) {
+      const targetUrl = actionType === "restart"
+        ? "{{ url_for('admin_bp.restart_pi') }}"
+        : "{{ url_for('admin_bp.shutdown_pi') }}";
+
+      const response = await fetch(targetUrl, {
+          method: "POST",
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+          credentials: "same-origin",
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || data.status === "error" || data.error) {
+          throw new Error(data.error || data.status || response.statusText);
+      }
+
+      return data;
+  }
+
+  function startCountdown(actionType, seconds = 5) {
+      const isRestart = actionType === "restart";
+      const container = isRestart ? restartCountdown : shutdownCountdown;
+      const bar = isRestart ? restartBar : shutdownBar;
+      const textWrap = isRestart ? restartCountdownText : shutdownCountdownText;
+      const secondsEl = isRestart ? restartSeconds : shutdownSeconds;
+
+      let remaining = seconds;
+      if (secondsEl) secondsEl.textContent = remaining;
+
+      container.classList.remove("hidden");
+      textWrap.classList.remove("hidden");
+
+      bar.style.transitionDuration = `${seconds * 1000}ms`;
+      bar.style.width = "0%";
+      // force reflow so the transition runs when we set it to 100%
+      void bar.offsetWidth;
+      bar.style.width = "100%";
+
+      if (countdownTicker) clearInterval(countdownTicker);
+      countdownTicker = setInterval(() => {
+          remaining -= 1;
+          if (remaining >= 0 && secondsEl) {
+              secondsEl.textContent = remaining;
+          }
+          if (remaining <= 0 && countdownTicker) {
+              clearInterval(countdownTicker);
+              countdownTicker = null;
+          }
+      }, 1000);
+  }
+
+  function scheduleReload() {
+      setTimeout(() => window.location.reload(), 8000);
+  }
+
+  function beginAction(actionType) {
+      resetTimers();
+      hideCountdowns();
+      const friendly = actionType === "restart" ? "Restart" : "Shutdown";
+
+      startCountdown(actionType);
+      setStatus(`${friendly} requested. Executing in 5s...`, "info");
+
+      countdownTimer = setTimeout(async () => {
+          try {
+              await postAction(actionType);
+              setStatus(`${friendly} command sent. Reloading in 8s...`, "success");
+              scheduleReload();
+          } catch (err) {
+              setStatus(`${friendly} failed: ${err.message}`, "error");
+          }
       }, 5000);
-  };
+  }
+
+  document.getElementById("restartNow").onclick = () => beginAction("restart");
+  document.getElementById("shutdownNow").onclick = () => beginAction("shutdown");
 </script>
 
 {% endblock %}

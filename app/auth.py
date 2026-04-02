@@ -1,4 +1,3 @@
-# Created by Anthony Kaiser 
 from flask import Blueprint, request, redirect, url_for, render_template, flash, session
 from flask_login import (
     LoginManager, login_user,
@@ -18,12 +17,10 @@ from datetime import datetime, timedelta
 from app import db
 from app.models.user import User
 from app.models.login_log import LoginLog
+from app.models.event_log import EventLog
 from app.models.reset_token import PasswordResetToken
 from app.totp import verify_totp
 
-# ------------------------------------------------------
-# Load environment & init components
-# ------------------------------------------------------
 load_dotenv()
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
@@ -31,10 +28,6 @@ login_manager = LoginManager()
 login_manager.login_view = "auth.login"
 
 
-# ------------------------------------------------------
-# FIXED: FLASK-LOGIN USER LOADER
-# Flask-Login stores user.id (integer), not username.
-# ------------------------------------------------------
 @login_manager.user_loader
 def load_user(user_id):
     try:
@@ -43,23 +36,47 @@ def load_user(user_id):
         return None
 
 
-# ------------------------------------------------------
-# Admin-only decorator
-# ------------------------------------------------------
+def _log_event(message: str, category: str = "auth"):
+    try:
+        db.session.add(EventLog(message=message[:255], category=category[:64]))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+
+def _client_ip() -> str:
+    ip_raw = request.headers.get("X-Forwarded-For", request.remote_addr) or ""
+    return ip_raw.split(",")[0].strip()
+
+
+def log_auth_event(action: str, status: str, user: str | None = None, detail: str | None = None):
+    username = user or (current_user.username if current_user.is_authenticated else "guest")
+    message = f"{action} status={status} user={username} ip={_client_ip()}"
+    if detail:
+        message = f"{message} detail={detail}"
+    _log_event(message, "auth")
+
+
+def log_authz_event(action: str, status: str, user: str | None = None, detail: str | None = None):
+    username = user or (current_user.username if current_user.is_authenticated else "guest")
+    message = f"{action} status={status} user={username} ip={_client_ip()}"
+    if detail:
+        message = f"{message} detail={detail}"
+    _log_event(message, "authz")
+
+
 def admin_required(f):
     @wraps(f)
     @login_required
     def decorated(*args, **kwargs):
         if not current_user.is_authenticated or not current_user.is_admin():
+            log_authz_event("admin_required", "denied", detail=request.path)
             flash("Administrator permissions required.", "danger")
             return redirect(url_for("dashboard.dashboard"))
         return f(*args, **kwargs)
     return decorated
 
 
-# ------------------------------------------------------
-# Login event logger
-# ------------------------------------------------------
 def log_login_event(username: str, status: str):
     try:
         ip_raw = request.headers.get("X-Forwarded-For", request.remote_addr) or ""
@@ -72,10 +89,7 @@ def log_login_event(username: str, status: str):
         db.session.rollback()
 
 
-# ------------------------------------------------------
-# Create temporary user (pending approval)
-# ------------------------------------------------------
-def create_temp_user(username, email=None, role="user", is_approved=False):
+def create_temp_user(username, email=None, role="viewer", is_approved=False):
     if User.query.filter_by(username=username).first():
         return None
 
@@ -84,7 +98,7 @@ def create_temp_user(username, email=None, role="user", is_approved=False):
     user = User(
         username=username,
         email=email or f"{username}@example.com",
-        role=role or "user",
+        role=role or "viewer",
         is_temp_password=True,
         is_approved=is_approved,
         theme="dark",
@@ -98,9 +112,6 @@ def create_temp_user(username, email=None, role="user", is_approved=False):
     return temp_password
 
 
-# ------------------------------------------------------
-# Registration -> creates pending user
-# ------------------------------------------------------
 @auth_bp.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
@@ -116,6 +127,7 @@ def register():
             return render_template("register.html")
 
         temp_pw = create_temp_user(username, email)
+        log_auth_event("register", "submitted", username)
 
         flash(
             "Your account request was submitted. An administrator must approve your account before logging in.",
@@ -126,9 +138,6 @@ def register():
     return render_template("register.html")
 
 
-# ------------------------------------------------------
-# LOGIN (with approval check + CAPTCHA)
-# ------------------------------------------------------
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
     site_key = os.getenv("RECAPTCHA_SITE_KEY")
@@ -139,8 +148,8 @@ def login():
         recaptcha_response = request.form.get("g-recaptcha-response")
         totp_code = request.form.get("totp_code", "").strip()
 
-        # CAPTCHA required
         if not recaptcha_response:
+            log_auth_event("login", "failed_captcha", username or "unknown")
             flash("Please complete the CAPTCHA.", "danger")
             return render_template("login.html", site_key=site_key)
 
@@ -151,41 +160,45 @@ def login():
         ).json()
 
         if not verify.get("success"):
+            log_auth_event("login", "failed_captcha", username or "unknown")
             flash("CAPTCHA verification failed.", "danger")
             return render_template("login.html", site_key=site_key)
 
-        # --- Fetch user ---
         user = User.query.filter_by(username=username).first()
 
         if not user:
+            log_auth_event("login", "failed_no_user", username or "unknown")
             log_login_event(username or "unknown", "failed_no_user")
             flash("Invalid username or password.", "danger")
             return render_template("login.html", site_key=site_key)
 
         if not user.check_password(password):
+            log_auth_event("login", "failed_bad_password", username or "unknown")
             log_login_event(username, "failed_bad_password")
             flash("Invalid username or password.", "danger")
             return render_template("login.html", site_key=site_key)
 
-        # Must be approved unless admin
+        # Admins bypass the approval gate so they can always log in.
         if not user.is_approved and not user.is_admin():
+            log_auth_event("login", "blocked_pending_approval", username or "unknown")
             log_login_event(username, "blocked_pending_approval")
             flash("Your account is pending administrator approval.", "warning")
             return render_template("login.html", site_key=site_key)
 
-        # 2FA check if enabled
         if user.is_2fa_enabled:
             clean_code = re.sub(r"\\D", "", totp_code or "")
             if not clean_code or not verify_totp(user.totp_secret, clean_code):
+                log_auth_event("login", "failed_2fa", username or "unknown")
                 log_login_event(username, "failed_2fa")
                 flash("Invalid 2FA code.", "danger")
                 return render_template("login.html", site_key=site_key)
 
-        # --- Login success ---
         login_user(user)
+        session.permanent = True
+        session["last_activity"] = datetime.utcnow().timestamp()
         log_login_event(username, "success")
+        log_auth_event("login", "success", username)
 
-        # Force password change if temporary pw
         if user.is_temp_password:
             session["force_password_change"] = True
             flash("Please change your temporary password.", "warning")
@@ -197,15 +210,13 @@ def login():
     return render_template("login.html", site_key=site_key)
 
 
-# ------------------------------------------------------
-# LOGOUT
-# ------------------------------------------------------
 @auth_bp.route("/logout")
 @login_required
 def logout():
     session.pop("admin_verified", None)
     try:
         log_login_event(current_user.username if current_user else "unknown", "logout")
+        log_auth_event("logout", "success")
     except Exception:
         pass
     logout_user()
@@ -213,9 +224,6 @@ def logout():
     return redirect(url_for("auth.login"))
 
 
-# ------------------------------------------------------
-# Change Password
-# ------------------------------------------------------
 @auth_bp.route("/change_password", methods=["GET", "POST"])
 @login_required
 def change_password():
@@ -232,7 +240,7 @@ def change_password():
         new_pw = request.form.get("new_password")
         confirm_pw = request.form.get("confirm_password")
 
-        # Require current pw unless forced reset
+        # Skip current-password check when the user is being forced to change a temp password.
         if not force_reset:
             if not current_pw or not user.check_password(current_pw):
                 flash("Current password incorrect.", "danger")
@@ -242,26 +250,22 @@ def change_password():
             flash("Passwords do not match.", "danger")
             return render_template("change_password.html", force_reset=force_reset)
 
-        # Requirements
         if len(new_pw) < 15 or not re.search(r"\d", new_pw) or not re.search(r"[^A-Za-z0-9]", new_pw):
             flash("Password must be 15+ chars, include a number and a symbol.", "danger")
             return render_template("change_password.html", force_reset=force_reset)
 
-        # Save
         user.set_password(new_pw)
         user.is_temp_password = False
         db.session.commit()
         session.pop("force_password_change", None)
 
         flash("Password changed successfully.", "success")
+        log_auth_event("password_change", "success", user.username)
         return redirect(url_for("auth.login"))
 
     return render_template("change_password.html", force_reset=force_reset)
 
 
-# ------------------------------------------------------
-# Password Reset (Forgot Password)
-# ------------------------------------------------------
 def _smtp_config():
     return {
         "host": os.getenv("SMTP_HOST"),
@@ -314,10 +318,10 @@ def forgot_password():
 
         user = User.query.filter_by(email=email).first()
         if not user:
+            log_auth_event("password_reset_request", "unknown_email", detail=email)
             flash("If that email exists, a reset link has been sent.", "info")
             return redirect(url_for("auth.login"))
 
-        # Create token valid for 1 hour
         token = secrets.token_urlsafe(32)
         expires = datetime.utcnow() + timedelta(hours=1)
         reset_entry = PasswordResetToken(
@@ -337,9 +341,11 @@ def forgot_password():
 
         sent, err = _send_email(user.email, "Password Reset", body)
         if not sent:
+            log_auth_event("password_reset_request", "email_failed", user.username, detail=err or "smtp_error")
             flash(f"Could not send reset email: {err}", "danger")
             return render_template("forgot_password.html")
 
+        log_auth_event("password_reset_request", "sent", user.username)
         flash("If that email exists, a reset link has been sent.", "info")
         return redirect(url_for("auth.login"))
 
@@ -350,11 +356,13 @@ def forgot_password():
 def reset_password(token):
     reset_entry = PasswordResetToken.query.filter_by(token=token).first()
     if not reset_entry or reset_entry.used or reset_entry.expires_at < datetime.utcnow():
+        log_auth_event("password_reset", "invalid_or_expired", detail="token_invalid_or_expired")
         flash("Invalid or expired reset link.", "danger")
         return redirect(url_for("auth.login"))
 
     user = User.query.get(reset_entry.user_id)
     if not user:
+        log_auth_event("password_reset", "user_not_found", detail=str(reset_entry.user_id))
         flash("User not found.", "danger")
         return redirect(url_for("auth.login"))
 
@@ -376,6 +384,7 @@ def reset_password(token):
         db.session.commit()
 
         flash("Password reset successfully. You can now log in.", "success")
+        log_auth_event("password_reset", "success", user.username)
         return redirect(url_for("auth.login"))
 
     return render_template("reset_password.html")

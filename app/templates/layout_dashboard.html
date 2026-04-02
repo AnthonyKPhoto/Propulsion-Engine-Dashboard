@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{% block title %}Dashboard{% endblock %}</title>
+  <title>{% block title %}Dashboard{% endblock %} – Hybrid Turbojet</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
 
   <script src="https://cdn.tailwindcss.com"></script>
 
@@ -51,7 +52,7 @@
     <div class="flex items-center">
       <button id="menu-btn" class="text-{{ accent_color }}-400 text-2xl mr-3 focus:outline-none">☰</button>
       <span class="text-{{ accent_color }}-400 font-semibold text-lg">
-        Propulsion Jet Dashboard
+        Hybrid Turbojet Dashboard
       </span>
     </div>
 
@@ -67,9 +68,13 @@
         <span class="px-3 py-1 rounded-full text-xs font-bold bg-green-700/40 text-green-300 badge-admin">
           ADMIN
         </span>
+      {% elif role is defined and role|lower == "operator" %}
+        <span class="px-3 py-1 rounded-full text-xs font-bold bg-amber-700/40 text-amber-200 badge-user">
+          OPERATOR
+        </span>
       {% else %}
         <span class="px-3 py-1 rounded-full text-xs font-bold bg-sky-700/40 text-sky-300 badge-user">
-          USER
+          VIEWER
         </span>
       {% endif %}
 
@@ -93,16 +98,6 @@
               {% if theme == 'light' %}light-hover{% else %}dark-hover{% endif %}
               text-{{ accent_color }}-400">
        Dashboard
-    </a>
-
-    <a href="{{ url_for('dashboard.monitoring') }}"
-       class="block px-4 py-3
-              {% if current_path.startswith('/dashboard/monitoring') %}
-                bg-{{ accent_color }}-700/30 font-semibold
-              {% endif %}
-              {% if theme == 'light' %}light-hover{% else %}dark-hover{% endif %}
-              text-{{ accent_color }}-400">
-       Monitoring
     </a>
 
     <a href="{{ url_for('dashboard.logs') }}"

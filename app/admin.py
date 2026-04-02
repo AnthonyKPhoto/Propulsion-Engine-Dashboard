@@ -1,22 +1,18 @@
-
-# app/admin.py
-# Created by Anthony Kaiser
-
 from flask import (
     Blueprint, render_template, request, redirect,
     url_for, flash, session, jsonify, send_file, after_this_request
 )
-# Created by Anthony Kaiser
 from flask_login import login_required, current_user
 from app import db
 from app.models.user import User
 from app.models.login_log import LoginLog
 from app.models.event_log import EventLog
-from app.auth import admin_required, create_temp_user
+from app.auth import admin_required, create_temp_user, log_authz_event, log_auth_event
 
 import secrets
 import subprocess
 import os
+import shutil
 import psutil
 import netifaces
 import glob
@@ -34,6 +30,7 @@ admin_bp = Blueprint("admin_bp", __name__, url_prefix="/admin")
 
 UPDATE_PROCESS = None
 UPDATE_LOG_PATH = "/tmp/jet_sysupdate.log"
+ALLOWED_ROLES = ("viewer", "operator", "admin")
 SAMPLE_EVENTS = [
     "Ignition toggled ON by Anthony",
     "Fuel valve OPENED",
@@ -42,25 +39,25 @@ SAMPLE_EVENTS = [
     "Emergency stop activated",
 ]
 
+# ---
 
-# ======================================================
-# HELPERS
-# ======================================================
 def _current_role():
     if not current_user.is_authenticated:
         return "guest", "guest"
-    return current_user.username.lower(), (current_user.role or "user").lower()
+    return current_user.username.lower(), current_user.role_key
 
 
 def _is_admin_verified():
     if not current_user.is_authenticated:
         return False
     if not session.get("admin_verified"):
+        log_authz_event("admin_verify", "denied", detail="not_verified")
         return False
 
     username, role = _current_role()
     if role == "admin" or current_user.is_admin() or username == "anthony":
         return True
+    log_authz_event("admin_verify", "denied", detail="role_mismatch")
     return False
 
 
@@ -81,7 +78,7 @@ def _serialize_user(user: User):
         "id": user.id,
         "username": user.username,
         "email": user.email,
-        "role": user.role,
+        "role": user.role_key,
         "is_approved": user.is_approved,
         "approved_label": "Yes" if user.is_approved else "No",
     }
@@ -100,8 +97,21 @@ def _email_valid(email: str) -> bool:
     """Very light email validation."""
     if not email or len(email) > 255:
         return False
-    # simple pattern; you can tighten later if you want
     return re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email) is not None
+
+
+def _resolve_exec(name: str) -> str | None:
+    """
+    Resolve executables even when service PATH is minimal (e.g., only venv/bin).
+    """
+    found = shutil.which(name)
+    if found:
+        return found
+    for base in ("/usr/bin", "/bin", "/usr/sbin", "/sbin"):
+        candidate = os.path.join(base, name)
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return candidate
+    return None
 
 
 def _smtp_config():
@@ -154,10 +164,8 @@ def _send_temp_password_email(to_email: str, username: str, temp_pw: str):
     except Exception as exc:
         return False, str(exc)
 
+# ---
 
-# ======================================================
-# CPU TEMP SUPPORT
-# ======================================================
 def get_cpu_temp_c():
     try:
         temps = psutil.sensors_temperatures()
@@ -177,10 +185,8 @@ def get_cpu_temp_c():
 
     return None
 
+# ---
 
-# ======================================================
-# SYSTEM METRICS API
-# ======================================================
 @admin_bp.route("/system/metrics")
 @login_required
 @admin_required
@@ -200,9 +206,6 @@ def system_metrics():
     })
 
 
-# ======================================================
-# ADMIN VERIFY
-# ======================================================
 @admin_bp.route("/", methods=["GET", "POST"])
 @login_required
 @admin_required
@@ -226,14 +229,12 @@ def admin_verify():
             return render_template("admin/access_denied.html")
 
         session["admin_verified"] = True
+        log_auth_event("admin_verify", "success", user.username)
         return render_template("admin/access_granted.html")
 
     return render_template("admin/verify.html")
 
 
-# ======================================================
-# ADMIN PANEL
-# ======================================================
 @admin_bp.route("/panel")
 @login_required
 @admin_required
@@ -244,10 +245,8 @@ def admin_panel():
     _, role = _current_role()
     return render_template("admin/index.html", role=role)
 
+# ---
 
-# ======================================================
-# USER & ROLE MANAGEMENT (FULL DB VERSION)
-# ======================================================
 @admin_bp.route("/users", methods=["GET", "POST"])
 @login_required
 @admin_required
@@ -257,7 +256,6 @@ def users():
             return jsonify({"status": "error", "message": "Admin verification required."}), 403
         return redirect(url_for("admin_bp.admin_verify"))
 
-    # ---------- POST (actions from modal) ----------
     if request.method == "POST":
         action = request.form.get("action", "").strip()
         user_id = request.form.get("user_id")
@@ -275,13 +273,10 @@ def users():
                 flash(message, category)
                 return redirect(url_for("admin_bp.users"))
 
-        # ==============================
-        # CREATE USER
-        # ==============================
         if action == "create_user":
             new_username = request.form.get("new_username", "").strip()
             new_email = request.form.get("new_email", "").strip()
-            new_role = request.form.get("new_role", "user").strip() or "user"
+            new_role = request.form.get("new_role", "viewer").strip() or "viewer"
 
             if not _username_valid(new_username):
                 return respond(
@@ -300,7 +295,7 @@ def users():
             temp_pw = create_temp_user(
                 new_username,
                 email=new_email or None,
-                role=new_role if new_role in ("admin", "user") else "user",
+                role=new_role if new_role in ALLOWED_ROLES else "viewer",
                 is_approved=True,
             )
 
@@ -338,9 +333,6 @@ def users():
         # Protect the primary 'anthony' account from destructive changes
         is_protected_anthony = user.username.lower() == "anthony"
 
-        # ==============================
-        # CHANGE USERNAME
-        # ==============================
         if action == "change_username":
             if is_protected_anthony:
                 return respond("error", "Primary admin username cannot be changed.", user, 403, "danger")
@@ -364,9 +356,6 @@ def users():
             db.session.commit()
             return respond("ok", "Username updated successfully.", user, 200, "success")
 
-        # ==============================
-        # CHANGE EMAIL
-        # ==============================
         elif action == "change_email":
             new_email = request.form.get("new_email", "").strip()
 
@@ -377,9 +366,6 @@ def users():
             db.session.commit()
             return respond("ok", "Email updated successfully.", user, 200, "success")
 
-        # ==============================
-        # RESET PASSWORD
-        # ==============================
         elif action == "reset":
             new_pw = secrets.token_urlsafe(8)
             user.set_password(new_pw)
@@ -393,20 +379,20 @@ def users():
                 "warning",
             )
 
-        # ==============================
-        # ROLE TOGGLE
-        # ==============================
-        elif action == "role":
+        elif action in ("role", "change_role"):
             if is_protected_anthony:
                 return respond("error", "Primary admin role cannot be changed.", user, 403, "danger")
+            if not current_user.is_admin():
+                return respond("error", "Administrator role required.", user, 403, "danger")
 
-            user.role = "admin" if user.role == "user" else "user"
+            new_role = request.form.get("new_role", "").strip().lower()
+            if new_role not in ALLOWED_ROLES:
+                return respond("error", "Invalid role selection.", user, 400, "danger")
+
+            user.role = new_role
             db.session.commit()
-            return respond("ok", f"Role changed → {user.role}", user, 200, "success")
+            return respond("ok", f"Role changed → {user.role_key}", user, 200, "success")
 
-        # ==============================
-        # DELETE USER
-        # ==============================
         elif action == "delete":
             if is_protected_anthony or user.is_admin():
                 return respond("error", "Admin / protected accounts cannot be deleted.", user, 403, "danger")
@@ -415,18 +401,13 @@ def users():
             db.session.commit()
             return respond("ok", "User deleted successfully.", None, 200, "success")
 
-        # ==============================
-        # APPROVE USER
-        # ==============================
         elif action == "approve":
             user.is_approved = True
             db.session.commit()
             return respond("ok", "User approved.", user, 200, "success")
 
-        # Unknown action
         return respond("error", "Unknown action.", user, 400, "danger")
 
-    # ---------- GET: render page ----------
     all_users = User.query.order_by(User.created_at.desc()).all()
     temp_pw = session.pop("last_temp_pw", None)
     return render_template(
@@ -436,10 +417,8 @@ def users():
         temp_pw=temp_pw,
     )
 
+# ---
 
-# ======================================================
-# LOGS (Placeholder)
-# ======================================================
 @admin_bp.route("/logs")
 @login_required
 @admin_required
@@ -472,10 +451,8 @@ def logs():
 
     return render_template("admin/logs.html", logs=formatted_logs)
 
+# ---
 
-# ======================================================
-# NETWORK STATUS
-# ======================================================
 @admin_bp.route("/network/status/json")
 @login_required
 @admin_required
@@ -536,9 +513,6 @@ def network_status_page():
     return render_template("admin/network_status.html")
 
 
-# ======================================================
-# PORT MONITORING
-# ======================================================
 @admin_bp.route("/network/ports/json")
 @login_required
 @admin_required
@@ -578,40 +552,7 @@ def network_ports_page():
         return redirect(url_for("admin_bp.admin_verify"))
     return render_template("admin/port_monitoring.html")
 
-
-# ======================================================
-# RESTART / SHUTDOWN
-# ======================================================
-def _restart_service():
-    """
-    Try to restart the dashboard service. We allow an environment override for
-    the service name so deployments (gunicorn, different unit names) can work
-    without code changes.
-    """
-    service_env = os.getenv("JET_SERVICE_NAME")
-    candidates = []
-    if service_env:
-        candidates.append(service_env)
-    candidates.extend(["jet_dashboard.service", "gunicorn"])
-
-    errors = []
-    for svc in candidates:
-        try:
-            result = subprocess.run(
-                ["sudo", "systemctl", "restart", svc],
-                capture_output=True,
-                text=True,
-            )
-            if result.returncode == 0:
-                return True, svc, None
-            errors.append(f"{svc}: {result.stderr.strip() or result.stdout.strip()}")
-        except FileNotFoundError:
-            errors.append("sudo not found on system.")
-            break
-        except Exception as exc:
-            errors.append(f"{svc}: {exc}")
-    return False, None, "; ".join(errors)
-
+# ---
 
 def _run_cmd(cmd, env=None):
     """Run a shell command and return (ok, stdout, stderr)."""
@@ -633,7 +574,6 @@ def _restart_service():
       2) systemd restart using JET_SERVICE_NAME override or fallbacks
       3) HUP a gunicorn master PID (JET_GUNICORN_PID env or /run/gunicorn.pid)
     """
-    # 1) Custom command override
     custom_cmd = os.getenv("JET_RESTART_CMD")
     if custom_cmd:
         ok, out, err = _run_cmd(["bash", "-c", custom_cmd])
@@ -641,7 +581,6 @@ def _restart_service():
             return True, custom_cmd, None
         return False, None, err or out or "Custom restart command failed"
 
-    # 2) systemd service restart
     service_env = os.getenv("JET_SERVICE_NAME")
     candidates = []
     if service_env:
@@ -655,7 +594,6 @@ def _restart_service():
             return True, svc, None
         errors.append(f"{svc}: {err or out}")
 
-    # 3) Gunicorn PID HUP
     gunicorn_pid_env = os.getenv("JET_GUNICORN_PID")
     gunicorn_pid_file = gunicorn_pid_env or "/run/gunicorn.pid"
     if os.path.exists(gunicorn_pid_file):
@@ -663,7 +601,6 @@ def _restart_service():
             with open(gunicorn_pid_file, "r") as f:
                 pid_str = f.read().strip()
             if pid_str.isdigit():
-                # try without sudo first
                 ok, out, err = _run_cmd(["kill", "-HUP", pid_str])
                 if not ok:
                     ok, out, err = _run_cmd(["sudo", "kill", "-HUP", pid_str])
@@ -673,7 +610,7 @@ def _restart_service():
         except Exception as exc:
             errors.append(f"gunicorn pid read: {exc}")
 
-    # 4) Gunicorn master via psutil (last resort)
+    # Last resort: find the gunicorn master process via psutil
     try:
         masters = []
         for proc in psutil.process_iter(["name", "cmdline", "pid"]):
@@ -718,11 +655,23 @@ def restart_pi():
     if not _is_admin_verified():
         return jsonify({"error": "Permission denied"}), 403
 
-    success, svc_name, err = _restart_service()
-    if not success:
-        return jsonify({"status": "error", "error": err or "Restart failed"}), 500
+    try:
+        proc = subprocess.run(
+            ["sudo", "shutdown", "-r", "now"],
+            capture_output=True,
+            text=True,
+        )
+        if proc.returncode != 0:
+            return (
+                jsonify({"status": "error", "error": proc.stderr or proc.stdout}),
+                500,
+            )
+    except FileNotFoundError:
+        return jsonify({"status": "error", "error": "sudo not found"}), 500
+    except Exception as exc:
+        return jsonify({"status": "error", "error": str(exc)}), 500
 
-    return jsonify({"status": "ok", "service": svc_name})
+    return jsonify({"status": "ok"})
 
 
 @admin_bp.route("/system/shutdown", methods=["POST"])
@@ -750,10 +699,8 @@ def shutdown_pi():
 
     return jsonify({"status": "ok"})
 
+# ---
 
-# ======================================================
-# SYSTEM UPDATE
-# ======================================================
 @admin_bp.route("/system-update/start", methods=["POST"])
 @login_required
 @admin_required
@@ -776,7 +723,19 @@ def system_update_start():
 
     update_cmd = os.getenv("JET_UPDATE_CMD", "apt update && apt -y upgrade")
     use_sudo = os.getenv("JET_UPDATE_USE_SUDO", "1") != "0"
-    cmd = (["sudo"] if use_sudo else []) + ["bash", "-c", update_cmd]
+    bash_exec = _resolve_exec("bash")
+    if not bash_exec:
+        return jsonify({"error": "bash not found on system."}), 500
+
+    sudo_exec = _resolve_exec("sudo")
+    if use_sudo and not sudo_exec:
+        return jsonify({"error": "sudo not found on system."}), 500
+
+    cmd = ([sudo_exec] if use_sudo else []) + [bash_exec, "-lc", update_cmd]
+    proc_env = os.environ.copy()
+    proc_env["PATH"] = (
+        f"{proc_env.get('PATH', '')}:/usr/bin:/bin:/usr/sbin:/sbin"
+    ).strip(":")
 
     try:
         UPDATE_PROCESS = subprocess.Popen(
@@ -784,6 +743,7 @@ def system_update_start():
             stdout=log,
             stderr=subprocess.STDOUT,
             text=True,
+            env=proc_env,
         )
     except FileNotFoundError as exc:
         return jsonify({"error": f"Command not found: {exc}"}), 500
@@ -826,10 +786,8 @@ def system_update_status():
         "exit_code": exit_code
     })
 
+# ---
 
-# ======================================================
-# EVENT LOGS (System Messages)
-# ======================================================
 def _ensure_sample_events():
     if EventLog.query.count() == 0:
         for msg in SAMPLE_EVENTS:
@@ -896,10 +854,8 @@ def last_log_timestamp():
         "timestamp": latest.created_at.isoformat() + "Z" if latest else None
     })
 
+# ---
 
-# ======================================================
-# BACKUP & RESTORE
-# ======================================================
 @admin_bp.route("/backup/download", methods=["GET"])
 @login_required
 @admin_required

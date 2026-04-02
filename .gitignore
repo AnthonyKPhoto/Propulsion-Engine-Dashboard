@@ -8,3 +8,20 @@ __pycache__/
 *.pem
 *.key
 *.crt
+
+# User-uploaded profile images (contain PII)
+app/static/profiles/*
+!app/static/profiles/default.png
+
+# Build artifacts / packaging
+*.zip
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# OS files
+.DS_Store
+
+# Claude Code
+.claude/

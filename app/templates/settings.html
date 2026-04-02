@@ -7,7 +7,8 @@
 
   <!-- Profile image + upload -->
   <div class="mb-6 flex items-center gap-4">
-    <img src="{{ url_for('static', filename='profiles/' ~ current_user.profile_image) }}"
+    {% set profile_image = current_user.profile_image or 'default.png' %}
+    <img src="{{ url_for('static', filename='profiles/' ~ profile_image) }}"
          class="w-20 h-20 rounded-full border border-slate-700 object-cover">
 
     <div>

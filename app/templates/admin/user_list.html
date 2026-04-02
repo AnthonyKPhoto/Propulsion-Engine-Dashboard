@@ -54,12 +54,18 @@
 
                 <td class="font-bold">
                     {% if theme == 'light' %}
-                        <span class="px-2 py-1 rounded-full text-xs {% if u.role == 'admin' %}bg-emerald-100 text-emerald-700{% else %}bg-{{ accent_color }}-100 text-{{ accent_color }}-700{% endif %}">
-                            {{ u.role }}
+                        <span class="px-2 py-1 rounded-full text-xs
+                            {% if u.role_key == 'admin' %}bg-emerald-100 text-emerald-700
+                            {% elif u.role_key == 'operator' %}bg-amber-100 text-amber-700
+                            {% else %}bg-{{ accent_color }}-100 text-{{ accent_color }}-700{% endif %}">
+                            {{ u.role_key }}
                         </span>
                     {% else %}
-                        <span class="px-2 py-1 rounded-full text-xs {% if u.role == 'admin' %}bg-emerald-900/40 text-emerald-200{% else %}bg-{{ accent_color }}-900/40 text-{{ accent_color }}-200{% endif %}">
-                            {{ u.role }}
+                        <span class="px-2 py-1 rounded-full text-xs
+                            {% if u.role_key == 'admin' %}bg-emerald-900/40 text-emerald-200
+                            {% elif u.role_key == 'operator' %}bg-amber-900/40 text-amber-200
+                            {% else %}bg-{{ accent_color }}-900/40 text-{{ accent_color }}-200{% endif %}">
+                            {{ u.role_key }}
                         </span>
                     {% endif %}
                 </td>
@@ -86,11 +92,15 @@
                         Email
                     </button>
 
-                    <!-- Toggle Role -->
-                    <button class="text-orange-500 underline"
-                        onclick="openConfirmModal('toggle_role', {{ u.id }}, 'Toggle role for {{ u.username }}?')">
-                        Role
-                    </button>
+                    <!-- Change Role (Admin only) -->
+                    {% if role == "admin" %}
+                        <button class="text-orange-500 underline"
+                            onclick="openRoleModal({{ u.id }}, '{{ u.role_key }}')">
+                            Role
+                        </button>
+                    {% else %}
+                        <span class="text-slate-400">Role</span>
+                    {% endif %}
 
                     <!-- Reset Password -->
                     <button class="text-yellow-500 underline"
@@ -160,7 +170,8 @@
 
         <label class="block text-sm {{ muted_text }}">Role</label>
         <select name="new_role" class="{{ input_styles }}">
-            <option value="user" selected>User</option>
+            <option value="viewer" selected>Viewer</option>
+            <option value="operator">Operator</option>
             <option value="admin">Admin</option>
         </select>
 
@@ -171,6 +182,25 @@
     </form>
 </div>
 
+<!-- ROLE MODAL -->
+<div id="role-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center">
+    <form method="POST" class="{{ modal_panel }} p-6 rounded shadow w-96 space-y-3">
+        <h2 class="text-xl font-semibold {% if theme == 'light' %}text-{{ accent_color }}-600{% else %}text-{{ accent_color }}-400{% endif %}">Change Role</h2>
+
+        <input type="hidden" name="action" value="change_role">
+        <input type="hidden" name="user_id" id="role-user-id">
+
+        <label class="block text-sm {{ muted_text }}">Role</label>
+        <select name="new_role" id="role-select" class="{{ input_styles }}">
+            <option value="viewer">Viewer</option>
+            <option value="operator">Operator</option>
+            <option value="admin">Admin</option>
+        </select>
+
+        <button class="bg-{{ accent_color }}-600 hover:bg-{{ accent_color }}-500 px-4 py-2 rounded text-white w-full">Save</button>
+        <button type="button" onclick="closeAllModals()" class="mt-1 {{ muted_text }} underline w-full">Cancel</button>
+    </form>
+</div>
 
 
 <script>
@@ -178,6 +208,7 @@ function closeAllModals() {
     document.getElementById("edit-modal").classList.add("hidden");
     document.getElementById("confirm-modal").classList.add("hidden");
     document.getElementById("add-user-modal").classList.add("hidden");
+    document.getElementById("role-modal").classList.add("hidden");
 }
 
 
@@ -206,7 +237,7 @@ function openEditModal(action, id, value) {
 }
 
 
-/* ========= OPEN CONFIRM MODAL (role, reset, delete, approve) ========= */
+/* ========= OPEN CONFIRM MODAL (reset, delete, approve) ========= */
 function openConfirmModal(action, id, text) {
     closeAllModals();
 
@@ -221,6 +252,14 @@ function openConfirmModal(action, id, text) {
 function openAddUserModal() {
     closeAllModals();
     document.getElementById("add-user-modal").classList.remove("hidden");
+}
+
+function openRoleModal(id, role) {
+    closeAllModals();
+    document.getElementById("role-user-id").value = id;
+    const roleSelect = document.getElementById("role-select");
+    roleSelect.value = role || "viewer";
+    document.getElementById("role-modal").classList.remove("hidden");
 }
 </script>
 

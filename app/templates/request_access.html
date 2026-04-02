@@ -1,97 +1,96 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Request Access</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Request Access – Hybrid Turbojet Dashboard</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
   <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+
   <style>
     body {
-      margin: 0;
+      background: linear-gradient(165deg, #0f172a 0%, #1e40af 90%);
+      background-image: url("{{ url_for('static', filename='images/login-bg.jpg') }}");
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
       height: 100vh;
       display: flex;
-      justify-content: center;
       align-items: center;
-      font-family: "Segoe UI", sans-serif;
-      color: #e2e8f0;
-      background: 
-        linear-gradient(rgba(15, 23, 42, 0.85), rgba(15, 23, 42, 0.85)),
-        url('{{ url_for("static", filename="images/login-bg.jpg") }}') center center/cover no-repeat fixed;
-    }
-
-    .access-box {
-      background: rgba(30, 41, 59, 0.9);
-      border: 1px solid #1e293b;
-      border-radius: 12px;
-      padding: 2rem;
-      width: 380px;
-      text-align: center;
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
-    }
-
-    h2 {
-      margin-bottom: 1rem;
-      color: #f8fafc;
-    }
-
-    input, textarea {
-      width: 100%;
-      padding: 10px;
-      margin: 8px 0;
-      border: none;
-      border-radius: 8px;
-      background: #1e293b;
-      color: #f8fafc;
-    }
-
-    button {
-      width: 100%;
-      padding: 10px;
-      margin-top: 10px;
-      background-color: #2563eb;
-      border: none;
-      border-radius: 8px;
-      color: white;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    button:hover {
-      background-color: #1d4ed8;
-    }
-
-    a {
-      color: #60a5fa;
-      text-decoration: none;
-      display: inline-block;
-      margin-top: 15px;
-    }
-
-    a:hover {
-      text-decoration: underline;
-    }
-
-    .g-recaptcha {
-      margin: 15px 0;
-      display: flex;
       justify-content: center;
     }
   </style>
 </head>
+
 <body>
-  <div class="access-box">
-    <h2>Request Access</h2>
-    <form method="POST">
-      <input type="text" name="username" placeholder="Desired Username" required />
-      <input type="email" name="email" placeholder="Email Address" required />
-      <textarea name="reason" placeholder="Reason for Access" rows="4" required></textarea>
+  <div class="w-full max-w-md px-8 py-10 rounded-2xl shadow-2xl border border-slate-700/60 backdrop-blur-lg"
+       style="background: rgba(15, 23, 42, 0.85);">
 
-      <!-- Google reCAPTCHA -->
-      <div class="g-recaptcha" data-sitekey="{{ site_key }}"></div>
+    <h2 class="text-center text-2xl font-semibold text-sky-400 mb-2">
+      Request Access
+    </h2>
+    <p class="text-center text-sm text-slate-400 mb-6">
+      Submit your details and an administrator will review your request.
+    </p>
 
-      <button type="submit">Submit Request</button>
+    <form method="POST" class="space-y-5">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div>
+        <label for="username" class="block mb-1 text-slate-300">Desired Username</label>
+        <input type="text" id="username" name="username"
+               class="w-full px-4 py-2.5 rounded-lg bg-slate-900 border border-slate-600 text-slate-100
+                      focus:ring-2 focus:ring-sky-500 focus:outline-none"
+               placeholder="Username" required>
+      </div>
+
+      <div>
+        <label for="email" class="block mb-1 text-slate-300">Email Address</label>
+        <input type="email" id="email" name="email"
+               class="w-full px-4 py-2.5 rounded-lg bg-slate-900 border border-slate-600 text-slate-100
+                      focus:ring-2 focus:ring-sky-500 focus:outline-none"
+               placeholder="name@example.com" required>
+      </div>
+
+      <div>
+        <label for="reason" class="block mb-1 text-slate-300">Reason for Access</label>
+        <textarea id="reason" name="reason" rows="4"
+                  class="w-full px-4 py-2.5 rounded-lg bg-slate-900 border border-slate-600 text-slate-100
+                         focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                  placeholder="Briefly describe why you need access." required></textarea>
+      </div>
+
+      <div class="flex justify-center">
+        <div class="g-recaptcha" data-sitekey="{{ site_key }}"></div>
+      </div>
+
+      <button type="submit"
+              class="w-full bg-sky-600 hover:bg-sky-700 text-white font-semibold py-2.5 rounded-lg
+                     transition duration-200 shadow-md">
+        Submit Request
+      </button>
     </form>
-    <a href="{{ url_for('auth.login') }}">← Return to Login</a>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="mt-4">
+          {% for category, msg in messages %}
+            <p class="text-center text-sm
+              {% if category == 'danger' %}text-red-400{% else %}text-emerald-400{% endif %}">
+              {{ msg }}
+            </p>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <div class="text-center mt-6 text-slate-400 text-sm">
+      <a href="{{ url_for('auth.login') }}" class="text-sky-400 hover:underline">
+        ← Return to Login
+      </a>
+    </div>
   </div>
 </body>
 </html>

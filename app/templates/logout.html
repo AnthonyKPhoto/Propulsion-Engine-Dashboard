@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Logged Out - SD Propulsion</title>
+  <title>Logged Out – Hybrid Turbojet Dashboard</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
   <style>
     body {
       background-color: #0f172a;
@@ -57,7 +58,7 @@
 <body>
   <div class="logout-container">
     <h1>Logged Out Successfully</h1>
-    <p>You’ve been securely logged out of the Propulsion Dashboard.</p>
+    <p>You’ve been securely logged out of the Hybrid Turbojet Dashboard.</p>
     <form action="{{ url_for('auth.login') }}">
       <button type="submit" class="login-button">Login Again</button>
     </form>

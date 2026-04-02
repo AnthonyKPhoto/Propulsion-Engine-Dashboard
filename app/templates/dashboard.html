@@ -13,19 +13,34 @@
 </style>
 <div class="space-y-8 max-w-5xl mx-auto px-4">
   <div>
-    <h1 class="text-5xl font-bold text-{{ accent }}-400">Jet Dashboard</h1>
     <p class="text-lg {% if theme == 'light' %}text-gray-700{% else %}text-slate-300{% endif %}">
     </p>
   </div>
 
   <!-- Top Status Bar -->
+  <div id="estop-banner"
+       class="hidden rounded-xl border border-rose-500/50 bg-rose-600/20 px-4 py-3 text-rose-200 font-semibold">
+    EMERGENCY STOP ACTIVATED
+  </div>
+  <div id="admin-approval-panel"
+       class="hidden fixed right-4 bottom-4 z-50 max-w-sm w-full rounded-2xl border p-4 shadow-2xl {% if theme == 'light' %}bg-white border-gray-300 text-gray-900{% else %}bg-slate-800 border-slate-600 text-slate-100{% endif %}">
+    <div class="flex items-center justify-between mb-2">
+      <h3 class="font-semibold text-{{ accent }}-400">Approval Required</h3>
+      <span id="approval-countdown" class="text-xs px-2 py-1 rounded-full border border-amber-500/40 text-amber-200 bg-amber-500/10">15s</span>
+    </div>
+    <p id="approval-message" class="text-sm {% if theme == 'light' %}text-gray-700{% else %}text-slate-300{% endif %} mb-3"></p>
+    <div class="flex gap-2">
+      <button id="approval-approve" class="flex-1 px-3 py-2 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold">Approve</button>
+      <button id="approval-reject" class="flex-1 px-3 py-2 rounded bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold">Reject</button>
+    </div>
+  </div>
   <div class="rounded-2xl border p-4 shadow-lg flex flex-col gap-3 md:flex-row md:items-center md:justify-between {% if theme == 'light' %}bg-white border-gray-200{% else %}bg-slate-800 border-slate-700{% endif %}">
     <div class="flex items-center gap-3">
       <button id="log-toggle"
-        class="px-4 py-2 rounded-full font-semibold text-white bg-emerald-600 hover:bg-emerald-500 shadow">
-        Logs: Enabled
+        class="px-4 py-2 rounded-full font-semibold text-white bg-rose-600 hover:bg-rose-500 shadow">
+        Logs: Disabled
       </button>
-      <span id="log-dot" class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+      <span id="log-dot" class="inline-block w-2 h-2 rounded-full bg-rose-500"></span>
       <span class="text-sm {% if theme == 'light' %}text-gray-600{% else %}text-slate-400{% endif %}">Tap to toggle logging</span>
     </div>
 
@@ -41,21 +56,17 @@
     </div>
 
     <div class="flex items-center gap-3">
-      <span class="text-sm {% if theme == 'light' %}text-gray-700{% else %}text-slate-300{% endif %}">System Status</span>
+      <span class="text-sm {% if theme == 'light' %}text-gray-700{% else %}text-slate-300{% endif %}">System State</span>
       <span id="system-status"
             class="px-3 py-1 rounded-full text-xs font-semibold bg-slate-700 text-slate-100"
-            data-state="idle">
+            data-state="IDLE">
         Idle
       </span>
-    <button id="status-cycle"
-      class="text-xs px-3 py-1 rounded border border-{{ accent }}-500 text-{{ accent }}-500 hover:bg-{{ accent }}-500/10">
-      Cycle
-    </button>
   </div>
   </div>
 
-  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 items-start">
-    <section class="rounded-2xl border p-6 shadow-lg {% if theme == 'light' %}bg-white border-gray-200{% else %}bg-slate-800 border-slate-700{% endif %}">
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start mt-6 md:mt-8">
+    <section class="rounded-2xl border p-6 shadow-lg h-full {% if theme == 'light' %}bg-white border-gray-200{% else %}bg-slate-800 border-slate-700{% endif %}">
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-2xl font-semibold text-{{ accent }}-400">Telemetry</h2>
         <span class="text-sm {% if theme == 'light' %}text-gray-500{% else %}text-slate-400{% endif %}"></span>
@@ -65,27 +76,40 @@
           <div class="flex items-center gap-2">
             <span class="inline-block w-2 h-2 rounded-full bg-emerald-500" id="dot-Intake"></span>
             <span>Intake</span>
+            <span id="offline-Intake" class="hidden text-xs text-rose-300">Sensor offline</span>
           </div>
           <span class="font-semibold flex items-center gap-1">
-            <span id="Intake">0</span> <span>°{{ temp_unit or 'C' }}</span>
+            <span id="Intake">--</span> <span>°{{ temp_unit or 'C' }}</span>
           </span>
         </li>
         <li class="flex justify-between items-center">
           <div class="flex items-center gap-2">
             <span class="inline-block w-2 h-2 rounded-full bg-emerald-500" id="dot-Exhaust"></span>
             <span>Exhaust</span>
+            <span id="offline-Exhaust" class="hidden text-xs text-rose-300">Sensor offline</span>
           </div>
           <span class="font-semibold flex items-center gap-1">
-            <span id="Exhaust">0</span> <span>°{{ temp_unit or 'C' }}</span>
+            <span id="Exhaust">--</span> <span>°{{ temp_unit or 'C' }}</span>
           </span>
         </li>
         <li class="flex justify-between items-center">
           <div class="flex items-center gap-2">
             <span class="inline-block w-2 h-2 rounded-full bg-emerald-500" id="dot-Fuel-Pressure"></span>
-            <span>Fuel Pressure</span>
+            <span class="whitespace-nowrap">Fuel Pressure</span>
+            <span id="offline-Fuel-Pressure" class="hidden text-xs text-rose-300">Sensor offline</span>
           </div>
-          <span class="font-semibold flex items-center gap-1">
-            <span id="Fuel-Pressure">0</span> <span>PSI</span>
+          <span class="font-semibold flex items-center gap-1 whitespace-nowrap">
+            <span id="Fuel-Pressure">--</span> <span>PSI</span>
+          </span>
+        </li>
+        <li class="flex justify-between items-center">
+          <div class="flex items-center gap-2">
+            <span class="inline-block w-2 h-2 rounded-full bg-emerald-500" id="dot-Axle-RPM"></span>
+            <span class="whitespace-nowrap">Axle RPM</span>
+            <span id="offline-Axle-RPM" class="hidden text-xs text-rose-300">Sensor offline</span>
+          </div>
+          <span class="font-semibold flex items-center gap-1 whitespace-nowrap">
+            <span id="Axle-RPM">--</span> <span>RPM</span>
           </span>
         </li>
         <li class="flex justify-between items-center">
@@ -100,39 +124,34 @@
       </ul>
     </section>
 
-    <section class="rounded-2xl border p-6 shadow-lg {% if theme == 'light' %}bg-white border-gray-200{% else %}bg-slate-800 border-slate-700{% endif %}">
+    <section class="rounded-2xl border p-6 shadow-lg h-full {% if theme == 'light' %}bg-white border-gray-200{% else %}bg-slate-800 border-slate-700{% endif %}">
       <h2 class="text-2xl font-semibold text-{{ accent }}-400 mb-4">Controls</h2>
-      <ul class="space-y-3 text-lg {% if theme == 'light' %}text-gray-800{% else %}text-slate-200{% endif %}">
-        <li class="flex justify-between items-center">Ignition <button id="ignition-btn" class="bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded text-base">OFF</button></li>
-        <li class="flex justify-between items-center">Fuel Valve <button id="fuelvalve-btn" class="bg-{{ accent }}-600 hover:bg-{{ accent }}-500 text-white px-4 py-2 rounded text-base">OFF</button></li>
-        <li class="flex justify-between items-center">Starter <button id="starter-btn" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded text-base">START</button></li>
+      <ul class="space-y-4 text-lg {% if theme == 'light' %}text-gray-800{% else %}text-slate-200{% endif %}">
+        <li class="flex flex-col gap-2">
+          <div class="grid grid-cols-[1fr_auto] items-center gap-3">
+            <span>Fuel Valve</span>
+            <button id="fuelvalve-btn" class="bg-{{ accent }}-600 hover:bg-{{ accent }}-500 text-white px-4 py-2 rounded text-base">OFF</button>
+          </div>
+          <div class="flex gap-2 text-xs">
+            <span id="fuel-commanded" class="px-2 py-1 rounded-full border">Commanded: OFF</span>
+            <span id="fuel-actual" class="px-2 py-1 rounded-full border">Actual: OFF</span>
+          </div>
+        </li>
+        <li class="flex flex-col gap-2">
+          <div class="grid grid-cols-[1fr_auto] items-center gap-3">
+            <span>Ignition</span>
+            <button id="start-btn" class="bg-emerald-700 hover:bg-emerald-600 text-white px-4 py-2 rounded text-base">Start</button>
+          </div>
+          <p class="text-xs text-slate-400">Spark fires automatically when axle RPM is detected.</p>
+        </li>
       </ul>
     </section>
 
     <section class="rounded-2xl border p-6 shadow-lg h-full {% if theme == 'light' %}bg-white border-gray-200{% else %}bg-slate-800 border-slate-700{% endif %}">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-2xl font-semibold text-{{ accent }}-400">Fan Speed</h2>
-        <div class="text-sm {% if theme == 'light' %}text-gray-700{% else %}text-slate-300{% endif %}">
-          <span id="Fan" class="font-semibold">0</span> RPM
-        </div>
-      </div>
-      <div class="flex items-center gap-3">
-        <button id="fan-decrease" class="px-3 py-2 rounded border border-{{ accent }}-500 text-{{ accent }}-500 hover:bg-{{ accent }}-500/10">-</button>
-        <input type="range" min="1" max="100" value="50" class="w-full accent-{{ accent }}-500 h-4" id="fanSpeed" />
-        <button id="fan-increase" class="px-3 py-2 rounded border border-{{ accent }}-500 text-{{ accent }}-500 hover:bg-{{ accent }}-500/10">+</button>
-      </div>
-      <div class="flex flex-wrap gap-2 mt-3">
-        <button data-preset="20" class="fan-preset px-3 py-1 rounded border border-{{ accent }}-500 text-{{ accent }}-500 hover:bg-{{ accent }}-500/10 text-xs">Idle</button>
-        <button data-preset="50" class="fan-preset px-3 py-1 rounded border border-{{ accent }}-500 text-{{ accent }}-500 hover:bg-{{ accent }}-500/10 text-xs">Cooling</button>
-        <button data-preset="80" class="fan-preset px-3 py-1 rounded border border-{{ accent }}-500 text-{{ accent }}-500 hover:bg-{{ accent }}-500/10 text-xs">Spin-Up</button>
-      </div>
-    </section>
-
-    <section class="rounded-2xl border p-6 shadow-lg {% if theme == 'light' %}bg-white border-gray-200{% else %}bg-slate-800 border-slate-700{% endif %} xl:col-span-1 xl:col-start-2">
       <h2 class="text-2xl font-semibold text-{{ accent }}-400 mb-4 text-center">Alarms</h2>
       <div class="space-y-3 text-lg {% if theme == 'light' %}text-gray-800{% else %}text-slate-200{% endif %} text-center">
         <div class="flex justify-center items-center gap-2">
-          <span>High Temp Alarm</span>
+          <span>Exhaust Temp Alarm</span>
           <input id="temperature-input" type="number" value="0"
                  class="w-24 text-center bg-transparent border border-{{ accent }}-400 rounded px-2 py-1">
           <span>°{{ temp_unit or 'C' }}</span>
@@ -143,105 +162,406 @@
           <span id="temperature" class="text-{{ accent }}-400 font-semibold">0</span>
           <span>°{{ temp_unit or 'C' }}</span>
         </div>
+        <div class="flex justify-center gap-2 text-xs">
+          <span id="alarm-armed" class="px-2 py-1 rounded-full border">Alarm Armed: NO</span>
+          <span id="alarm-triggered" class="px-2 py-1 rounded-full border">Alarm Triggered: NO</span>
+        </div>
       </div>
     </section>
   </div>
 </div>
 
+<script src="https://cdn.socket.io/4.5.4/socket.io.min.js" crossorigin="anonymous"></script>
 <script>
   (function() {
-    const logBtn = document.getElementById("log-toggle");
-    const logDot = document.getElementById("log-dot");
+    const csrfToken = "{{ csrf_token }}";
+    const role = "{{ role|lower }}";
+    const canControl = ["admin", "operator"].includes(role);
+    const isAdmin = role === "admin";
+    const statusPill = document.getElementById("system-status");
     const estopBtn = document.getElementById("estop-btn");
     const estopResetBtn = document.getElementById("estop-reset");
-    const statusPill = document.getElementById("system-status");
-    const statusCycle = document.getElementById("status-cycle");
+    const estopBanner = document.getElementById("estop-banner");
+    const fuelBtn = document.getElementById("fuelvalve-btn");
+    const startBtn = document.getElementById("start-btn");
+    const fuelCmd = document.getElementById("fuel-commanded");
+    const fuelAct = document.getElementById("fuel-actual");
     const uptimeDisplay = document.getElementById("uptime-display");
     const uptimeResetBtn = document.getElementById("uptime-reset-btn");
-    const fanRange = document.getElementById("fanSpeed");
-    const fanDisplay = document.getElementById("Fan");
-    const fanIncrease = document.getElementById("fan-increase");
-    const fanDecrease = document.getElementById("fan-decrease");
     const tempInput = document.getElementById("temperature-input");
     const tempSetBtn = document.getElementById("temperature-set");
     const tempDisplay = document.getElementById("temperature");
-    const ignitionBtn = document.getElementById("ignition-btn");
-    const fuelBtn = document.getElementById("fuelvalve-btn");
-    const starterBtn = document.getElementById("starter-btn");
-    const fanPresets = document.querySelectorAll(".fan-preset");
-
-    let logsEnabled = true;
-    const statusOrder = ["idle", "igniting", "live", "fault"];
-    let uptimeTimer = null;
-    let uptimeStart = null;
-    let estopActive = false;
-    let ignitionOn = false;
-    let fuelOn = false;
-    let running = false;
-    let lastLogTimestamp = null;
-    let alarmTriggered = false;
-    let alarmThreshold = parseFloat(tempInput?.value || "0") || 0;
-
-    const statusStyles = {
-      idle:   { text: "Idle", classes: "bg-slate-600 text-slate-100" },
-      igniting: { text: "Igniting", classes: "bg-amber-500 text-white" },
-      live: { text: "Live", classes: "bg-emerald-600 text-white" },
-      fault: { text: "Fault", classes: "bg-rose-600 text-white" },
-    };
-
+    const alarmArmedBadge = document.getElementById("alarm-armed");
+    const alarmTriggeredBadge = document.getElementById("alarm-triggered");
+    const logBtn = document.getElementById("log-toggle");
+    const logDot = document.getElementById("log-dot");
+    const panel = document.getElementById("admin-approval-panel");
+    const approvalMsg = document.getElementById("approval-message");
+    const approvalCountdown = document.getElementById("approval-countdown");
+    const approvalApproveBtn = document.getElementById("approval-approve");
+    const approvalRejectBtn = document.getElementById("approval-reject");
     const telemetryDots = {
       Intake: document.getElementById("dot-Intake"),
       Exhaust: document.getElementById("dot-Exhaust"),
       "Fuel-Pressure": document.getElementById("dot-Fuel-Pressure"),
+      "Axle-RPM": document.getElementById("dot-Axle-RPM"),
     };
-
+    const offlineIndicators = {
+      Intake: document.getElementById("offline-Intake"),
+      Exhaust: document.getElementById("offline-Exhaust"),
+      "Fuel-Pressure": document.getElementById("offline-Fuel-Pressure"),
+      "Axle-RPM": document.getElementById("offline-Axle-RPM"),
+    };
+    const statusStyles = {
+      IDLE: { text: "IDLE", classes: "bg-slate-600 text-slate-100" },
+      ARMED: { text: "ARMED", classes: "bg-amber-500 text-white" },
+      RUNNING: { text: "RUNNING", classes: "bg-emerald-600 text-white" },
+      FAULT: { text: "FAULT", classes: "bg-rose-600 text-white" },
+      SHUTDOWN: { text: "SHUTDOWN", classes: "bg-slate-800 text-slate-200" },
+    };
+    const baseBtn = "text-white px-4 py-2 rounded text-base shadow";
+    const fuelOnCls = `bg-emerald-600 hover:bg-emerald-500 ${baseBtn}`;
+    const fuelOffCls = `bg-{{ accent }}-600 hover:bg-{{ accent }}-500 ${baseBtn}`;
+    const badgeOnCls = "bg-emerald-600/25 text-emerald-200 border-emerald-500/40";
+    const badgeOffCls = "bg-slate-700/40 text-slate-300 border-slate-600/40";
+    const badgePendingCls = "bg-amber-500/20 text-amber-200 border-amber-500/40";
+    const initialState = {{ initial_control_state|tojson }};
     const telemetryTimestamps = {};
+
+    let controlState = initialState || {};
+    let pendingApproval = null;
+    let adminOnline = false;
+    let approvalTimer = null;
+    let uptimeTimer = null;
+    let uptimeStart = null;
+    let alarmThreshold = parseFloat(tempInput?.value || "0") || 0;
+    let alarmTriggered = false;
+    let lastLogTimestamp = null;
+    let logsEnabled = false;
+
+    function showToast(message, level = "info") {
+      const tone = {
+        info: "bg-sky-600",
+        warning: "bg-amber-600",
+        danger: "bg-rose-600",
+        success: "bg-emerald-600",
+      }[level] || "bg-sky-600";
+      const toast = document.createElement("div");
+      toast.className = `fixed top-4 right-4 ${tone} text-white px-4 py-2 rounded shadow-lg z-50`;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 3200);
+    }
+
+    function setBadge(el, label, isOn, isPending) {
+      if (!el) return;
+      const cls = isPending ? badgePendingCls : (isOn ? badgeOnCls : badgeOffCls);
+      const value = isPending ? "Pending" : (isOn ? "ON" : "OFF");
+      el.className = `px-2 py-1 rounded-full border ${cls}`;
+      el.textContent = `${label}: ${value}`;
+    }
+
+    function updateStatus(state) {
+      const info = statusStyles[state] || statusStyles.IDLE;
+      if (!statusPill) return;
+      statusPill.dataset.state = state;
+      statusPill.textContent = info.text;
+      statusPill.className = `px-3 py-1 rounded-full text-xs font-semibold ${info.classes}`;
+    }
+
+    function updateButtonsFromState() {
+      const fuelOpen = !!controlState.fuel_open;
+      const sparkOn = !!controlState.spark_on;
+      const estop = !!controlState.emergency_stop;
+      const pendingFuelOpen = pendingApproval && pendingApproval.action === "fuel_open";
+
+      if (fuelBtn) {
+        fuelBtn.textContent = fuelOpen ? "ON" : "OFF";
+        fuelBtn.className = fuelOpen ? fuelOnCls : fuelOffCls;
+      }
+      setBadge(fuelCmd, "Commanded", fuelOpen, pendingFuelOpen);
+      setBadge(fuelAct, "Actual", fuelOpen, false);
+
+      if (estopBanner) {
+        if (estop) estopBanner.classList.remove("hidden");
+        else estopBanner.classList.add("hidden");
+      }
+      updateStatus(controlState.system_state || "IDLE");
+      handleUptime(controlState.system_state || "IDLE");
+    }
+
+    function handleUptime(systemState) {
+      const active = systemState === "ARMED" || systemState === "RUNNING";
+      if (active && !uptimeTimer) {
+        uptimeStart = uptimeStart || Date.now();
+        uptimeTimer = setInterval(() => {
+          const elapsed = Date.now() - uptimeStart;
+          const total = Math.floor(elapsed / 1000);
+          const hh = String(Math.floor(total / 3600)).padStart(2, "0");
+          const mm = String(Math.floor((total % 3600) / 60)).padStart(2, "0");
+          const ss = String(total % 60).padStart(2, "0");
+          if (uptimeDisplay) uptimeDisplay.textContent = `${hh}:${mm}:${ss}`;
+        }, 1000);
+      } else if (!active && uptimeTimer) {
+        clearInterval(uptimeTimer);
+        uptimeTimer = null;
+      }
+      if (!active && uptimeDisplay) {
+        uptimeStart = null;
+        uptimeDisplay.textContent = "00:00:00";
+      }
+    }
 
     function setDotState(key, state) {
       const dot = telemetryDots[key];
       if (!dot) return;
-      const cls = {
-        good: "bg-emerald-500",
-        stale: "bg-amber-400",
-        lost: "bg-rose-500",
-      }[state];
-      if (cls) {
-        dot.className = `w-2 h-2 rounded-full ${cls}`;
-      }
+      const cls = { good: "bg-emerald-500", stale: "bg-amber-400", lost: "bg-rose-500" }[state];
+      if (cls) dot.className = `w-2 h-2 rounded-full ${cls}`;
     }
 
     function markTelemetryUpdate(key) {
       telemetryTimestamps[key] = Date.now();
       setDotState(key, "good");
+      if (offlineIndicators[key]) offlineIndicators[key].classList.add("hidden");
+    }
+
+    function parseNumber(value, digits = 1) {
+      const num = Number(value);
+      return Number.isNaN(num) ? value : num.toFixed(digits);
+    }
+
+    function updateTelemetryValue(id, value, formatter = null) {
+      const el = document.getElementById(id);
+      if (!el || value === undefined || value === null) return false;
+      el.textContent = formatter ? formatter(value) : value;
+      return true;
     }
 
     function monitorTelemetry() {
       setInterval(() => {
         const now = Date.now();
         Object.keys(telemetryDots).forEach((key) => {
-          const last = telemetryTimestamps[key] || 0;
-          const age = now - last;
-          if (age > 3000) {
+          const age = now - (telemetryTimestamps[key] || 0);
+          if (age > 8000) {
             setDotState(key, "lost");
-          } else if (age > 1000) {
+            if (offlineIndicators[key]) offlineIndicators[key].classList.remove("hidden");
+          } else if (age > 4500) {
             setDotState(key, "stale");
           } else {
             setDotState(key, "good");
+            if (offlineIndicators[key]) offlineIndicators[key].classList.add("hidden");
           }
         });
       }, 500);
     }
 
-    // Mutation observers to detect telemetry updates
-    Object.keys(telemetryDots).forEach((key) => {
-      const el = document.getElementById(key);
-      if (!el) return;
-      markTelemetryUpdate(key);
-      const observer = new MutationObserver(() => markTelemetryUpdate(key));
-      observer.observe(el, { characterData: true, childList: true, subtree: true });
-    });
-    monitorTelemetry();
+    async function postAction(action, requestId = null) {
+      const response = await fetch("/dashboard/api/control/action", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": csrfToken,
+        },
+        body: JSON.stringify({ action, request_id: requestId }),
+      });
+      const data = await response.json().catch(() => ({ ok: false, message: "Control request failed." }));
+      if (!response.ok || !data.ok) {
+        showToast(data.message || "Control request failed.", "danger");
+        return null;
+      }
+      if (data.pending && data.request) {
+        pendingApproval = data.request;
+      }
+      if (data.state) {
+        controlState = data.state;
+        updateButtonsFromState();
+      }
+      if (data.message) {
+        showToast(data.message, "info");
+      }
+      return data;
+    }
 
+    function checkTempAlarm() {
+      const armed = alarmThreshold > 0;
+      if (alarmArmedBadge) {
+        alarmArmedBadge.textContent = `Alarm Armed: ${armed ? "YES" : "NO"}`;
+        alarmArmedBadge.className = `px-2 py-1 rounded-full border ${armed ? badgeOnCls : badgeOffCls}`;
+      }
+      if (alarmTriggeredBadge) {
+        alarmTriggeredBadge.textContent = `Alarm Triggered: ${alarmTriggered ? "YES" : "NO"}`;
+        alarmTriggeredBadge.className = `px-2 py-1 rounded-full border ${alarmTriggered ? "bg-rose-600/25 text-rose-200 border-rose-500/40" : badgeOffCls}`;
+      }
+    }
+
+    function showApprovalPanel(requestData) {
+      if (!isAdmin || !panel) return;
+      pendingApproval = requestData;
+      panel.classList.remove("hidden");
+      const label = requestData.action === "fuel_open" ? "Open Fuel Valve" : requestData.action;
+      approvalMsg.textContent = `${requestData.operator} requested: ${label}`;
+      if (approvalTimer) clearInterval(approvalTimer);
+      const _receivedAt = Date.now();
+      const _timeoutMs = (requestData.timeout_seconds || 15) * 1000;
+      approvalTimer = setInterval(() => {
+        const sec = Math.max(0, Math.ceil((_timeoutMs - (Date.now() - _receivedAt)) / 1000));
+        approvalCountdown.textContent = `${sec}s`;
+        if (sec <= 0) {
+          clearInterval(approvalTimer);
+          approvalTimer = null;
+        }
+      }, 250);
+    }
+
+    function hideApprovalPanel() {
+      if (!panel) return;
+      panel.classList.add("hidden");
+      if (approvalTimer) clearInterval(approvalTimer);
+      approvalTimer = null;
+    }
+
+    if (!canControl) {
+      [fuelBtn, startBtn, estopBtn, estopResetBtn, tempSetBtn, uptimeResetBtn].forEach((el) => {
+        if (!el) return;
+        el.addEventListener("click", (e) => {
+          e.preventDefault();
+          showToast("User permissions not met.", "warning");
+        });
+      });
+    } else {
+      estopBtn?.addEventListener("click", async () => {
+        await postAction("emergency_stop");
+      });
+      estopResetBtn?.addEventListener("click", async () => {
+        const result = await postAction("reset_estop");
+        if (!result) return;
+
+        // Stop logging if running
+        if (logsEnabled) {
+          try {
+            const res = await fetch("/dashboard/api/logging/stop", {
+              method: "POST",
+              headers: { "X-CSRFToken": csrfToken },
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.ok) {
+              logsEnabled = false;
+              updateLogBtn();
+              updateLogDotByHeartbeat();
+            }
+          } catch (e) {}
+        }
+
+        // Clear alarm threshold on the server (broadcasts to all clients).
+        try {
+          await fetch("/dashboard/api/alarm/set", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+            body: JSON.stringify({ threshold: 0 }),
+          });
+        } catch (e) {}
+
+        // Reset uptime
+        uptimeStart = null;
+        if (uptimeDisplay) uptimeDisplay.textContent = "00:00:00";
+      });
+      fuelBtn?.addEventListener("click", async () => {
+        const action = controlState.fuel_open ? "fuel_close" : "fuel_open";
+        if (action === "fuel_open" && !isAdmin && !adminOnline) {
+          showToast("No admin is online for approval.", "warning");
+          return;
+        }
+        await postAction(action);
+      });
+      startBtn?.addEventListener("click", () => {
+        showToast("Ignition is automatic — spark fires when axle RPM is detected.", "info");
+      });
+      approvalApproveBtn?.addEventListener("click", async () => {
+        if (!pendingApproval) return;
+        await postAction("approve_request", pendingApproval.id);
+      });
+      approvalRejectBtn?.addEventListener("click", async () => {
+        if (!pendingApproval) return;
+        await postAction("reject_request", pendingApproval.id);
+      });
+    }
+
+    tempSetBtn?.addEventListener("click", async () => {
+      const val = parseFloat(tempInput?.value || "0");
+      if (Number.isNaN(val)) return;
+      try {
+        await fetch("/dashboard/api/alarm/set", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+          body: JSON.stringify({ threshold: val }),
+        });
+      } catch (e) {}
+      // Server broadcasts alarm_state to all clients; no local state change needed.
+    });
+    uptimeResetBtn?.addEventListener("click", () => {
+      uptimeStart = null;
+      if (uptimeDisplay) uptimeDisplay.textContent = "00:00:00";
+    });
+
+    const socket = io({ transports: ["websocket"] });
+    socket.on("sensor_update", (data) => {
+      const intake = data.intake_temp ?? data.intake;
+      const exhaust = data.exhaust_temp ?? data.exhaust;
+      const pressure = data.fuel_pressure ?? data.pressure;
+      const rpm = data.rpm;
+      const _rawExhaust = data.exhaust_temp ?? data.exhaust ?? data.temp;
+      const temp = (_rawExhaust != null && Number(_rawExhaust) < 1023) ? _rawExhaust : null;
+      // MAX6675: ~1023.75 means open-circuit fault — treat as offline. 0 is a valid reading.
+      const intakeValid = intake != null && Number(intake) < 1023;
+      const exhaustValid = exhaust != null && Number(exhaust) < 1023;
+      if (updateTelemetryValue("Intake", intakeValid ? intake : "--", (v) => v === "--" ? "--" : parseNumber(v, 1))) { if (intakeValid) markTelemetryUpdate("Intake"); }
+      if (updateTelemetryValue("Exhaust", exhaustValid ? exhaust : "--", (v) => v === "--" ? "--" : parseNumber(v, 1))) { if (exhaustValid) markTelemetryUpdate("Exhaust"); }
+      if (updateTelemetryValue("Fuel-Pressure", pressure, (v) => parseNumber(v, 1)) && pressure != null) markTelemetryUpdate("Fuel-Pressure");
+      if (updateTelemetryValue("Axle-RPM", rpm, (v) => Math.round(Number(v)).toString())) markTelemetryUpdate("Axle-RPM");
+      if (updateTelemetryValue("temperature", temp, (v) => parseNumber(v, 1))) checkTempAlarm();
+    });
+    socket.on("control_state_update", (state) => {
+      controlState = state || controlState;
+      pendingApproval = state?.pending_request || pendingApproval;
+      updateButtonsFromState();
+    });
+    socket.on("approval_request", (req) => {
+      if (isAdmin) showApprovalPanel(req);
+      if (!isAdmin) {
+        pendingApproval = req;
+        updateButtonsFromState();
+      }
+    });
+    socket.on("approval_cleared", () => {
+      pendingApproval = null;
+      hideApprovalPanel();
+      updateButtonsFromState();
+    });
+    socket.on("admin_presence", (payload) => {
+      adminOnline = !!payload?.online;
+    });
+    socket.on("alarm_state", (data) => {
+      const wasTriggered = alarmTriggered;
+      alarmThreshold = typeof data.threshold === "number" ? data.threshold : 0;
+      alarmTriggered = !!data.triggered;
+      if (tempInput) tempInput.value = alarmThreshold;
+      if (alarmTriggered && !wasTriggered) {
+        document.body.classList.add("flash-alert");
+        setTimeout(() => document.body.classList.remove("flash-alert"), 1200);
+        showToast("High-temp alarm triggered!", "danger");
+      }
+      checkTempAlarm();
+    });
+    socket.on("control_notice", (payload) => {
+      if (!payload?.message) return;
+      showToast(payload.message, payload.level || "info");
+      if (payload.message.toLowerCase().includes("timed out")) {
+        pendingApproval = null;
+        hideApprovalPanel();
+      }
+    });
+
+    const logHeartbeatUrl = "{{ url_for('admin_bp.last_log_timestamp') }}";
     function updateLogBtn(forceRed) {
       if (logsEnabled && !forceRed) {
         logBtn.textContent = "Logs: Enabled";
@@ -251,270 +571,67 @@
         logBtn.className = "px-4 py-2 rounded-full font-semibold text-white bg-rose-600 hover:bg-rose-500 shadow";
       }
     }
-
-    const logHeartbeatUrl = "{{ url_for('admin_bp.last_log_timestamp') }}";
-
     function updateLogDotByHeartbeat() {
       if (!logDot) return;
-      if (!logsEnabled) {
-        logDot.className = "inline-block w-2 h-2 rounded-full bg-rose-500";
-        return;
-      }
-      if (!lastLogTimestamp) {
+      if (!logsEnabled || !lastLogTimestamp) {
         logDot.className = "inline-block w-2 h-2 rounded-full bg-rose-500";
         return;
       }
       const age = Date.now() - lastLogTimestamp;
-      if (age > 6000) {
-        logDot.className = "inline-block w-2 h-2 rounded-full bg-rose-500";
-      } else if (age > 3000) {
-        logDot.className = "inline-block w-2 h-2 rounded-full bg-amber-400";
-      } else {
-        logDot.className = "inline-block w-2 h-2 rounded-full bg-emerald-500";
-      }
+      if (age > 6000) logDot.className = "inline-block w-2 h-2 rounded-full bg-rose-500";
+      else if (age > 3000) logDot.className = "inline-block w-2 h-2 rounded-full bg-amber-400";
+      else logDot.className = "inline-block w-2 h-2 rounded-full bg-emerald-500";
     }
-
     async function pollLogsHeartbeat() {
       try {
         const res = await fetch(logHeartbeatUrl, { headers: { "X-Requested-With": "XMLHttpRequest" } });
         const data = await res.json();
-        if (data && data.timestamp) {
-          lastLogTimestamp = Date.parse(data.timestamp);
+        if (data && data.timestamp) lastLogTimestamp = Date.parse(data.timestamp);
+      } catch (err) {}
+      updateLogDotByHeartbeat();
+    }
+    logBtn?.addEventListener("click", async () => {
+      const action = logsEnabled ? "stop" : "start";
+      try {
+        const res = await fetch(`/dashboard/api/logging/${action}`, {
+          method: "POST",
+          headers: { "X-CSRFToken": csrfToken },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.ok) {
+          logsEnabled = data.running;
+          updateLogBtn();
+          updateLogDotByHeartbeat();
+          showToast(data.message, logsEnabled ? "success" : "info");
+        } else {
+          showToast(data.message || "Failed to toggle logging.", "danger");
         }
-      } catch (err) {
-        // ignore
-      } finally {
-        updateLogDotByHeartbeat();
+      } catch (e) {
+        showToast("Failed to toggle logging.", "danger");
       }
-    }
+    });
 
-    function updateStatus(state) {
-      const info = statusStyles[state] || statusStyles.idle;
-      statusPill.dataset.state = state;
-      statusPill.textContent = info.text;
-      statusPill.className = `px-3 py-1 rounded-full text-xs font-semibold ${info.classes}`;
-      if (state === "igniting" || state === "live") {
-        startUptime();
-      } else {
-        stopUptime();
-      }
-    }
-
-    function refreshStatus() {
-      if (estopActive) {
-        updateStatus("fault");
-        return;
-      }
-      if (running) {
-        updateStatus("live");
-      } else if (ignitionOn || fuelOn) {
-        updateStatus("igniting");
-      } else {
-        updateStatus("idle");
-      }
-    }
-
-    function startUptime() {
-      uptimeStart = uptimeStart || Date.now();
-      if (uptimeTimer) return;
-      uptimeTimer = setInterval(() => {
-        const elapsed = Date.now() - uptimeStart;
-        const totalSeconds = Math.floor(elapsed / 1000);
-        const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, "0");
-        const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, "0");
-        const seconds = String(totalSeconds % 60).padStart(2, "0");
-        uptimeDisplay.textContent = `${hours}:${minutes}:${seconds}`;
-      }, 1000);
-    }
-
-    function stopUptime() {
-      if (uptimeTimer) {
-        clearInterval(uptimeTimer);
-        uptimeTimer = null;
-      }
-    }
-
-    function resetUptime() {
-      stopUptime();
-      uptimeStart = null;
-      if (uptimeDisplay) {
-        uptimeDisplay.textContent = "00:00:00";
-      }
-    }
-
-    if (logBtn) {
-      logBtn.addEventListener("click", () => {
-        logsEnabled = !logsEnabled;
+    async function syncLoggingState() {
+      try {
+        const res = await fetch("/dashboard/api/logging/status");
+        const data = await res.json();
+        logsEnabled = !!data.running;
         updateLogBtn();
         updateLogDotByHeartbeat();
-      });
-      updateLogBtn();
+      } catch (e) {}
     }
 
-    if (statusCycle) {
-      statusCycle.addEventListener("click", () => {
-        const current = statusPill.dataset.state || "idle";
-        const idx = statusOrder.indexOf(current);
-        const next = statusOrder[(idx + 1) % statusOrder.length];
-        updateStatus(next);
-      });
-      updateStatus(statusPill.dataset.state || "idle");
-    }
-
-    if (estopBtn) {
-      estopBtn.addEventListener("click", () => {
-        estopActive = true;
-        estopBtn.textContent = "🛑 STOPPED";
-        estopBtn.classList.add("animate-pulse");
-        updateStatus("fault");
-        resetUptime();
-      });
-    }
-
-    if (estopResetBtn) {
-      estopResetBtn.addEventListener("click", () => {
-        estopActive = false;
-        estopBtn.textContent = "🛑 Emergency Stop";
-        estopBtn.classList.remove("animate-pulse");
-        refreshStatus();
-      });
-    }
-
-    if (uptimeResetBtn) {
-      uptimeResetBtn.addEventListener("click", () => {
-        resetUptime();
-      });
-    }
-
-    function updateFanDisplay(val) {
-      if (fanDisplay) fanDisplay.textContent = val;
-    }
-
-    if (fanRange) {
-      fanRange.addEventListener("input", (e) => {
-        updateFanDisplay(e.target.value);
-      });
-      updateFanDisplay(fanRange.value);
-    }
-
-    if (fanIncrease) {
-      fanIncrease.addEventListener("click", () => {
-        let val = parseInt(fanRange.value || "0", 10);
-        val = Math.min(100, val + 1);
-        fanRange.value = val;
-        updateFanDisplay(val);
-      });
-    }
-
-    if (fanDecrease) {
-      fanDecrease.addEventListener("click", () => {
-        let val = parseInt(fanRange.value || "0", 10);
-        val = Math.max(1, val - 1);
-        fanRange.value = val;
-        updateFanDisplay(val);
-      });
-    }
-
-    if (fanPresets && fanPresets.length) {
-      fanPresets.forEach(btn => {
-        btn.addEventListener("click", () => {
-          const val = parseInt(btn.dataset.preset || "50", 10);
-          if (fanRange) {
-            fanRange.value = val;
-            updateFanDisplay(val);
-          }
-        });
-      });
-    }
-
-    if (tempSetBtn) {
-      tempSetBtn.addEventListener("click", () => {
-        const val = parseFloat(tempInput.value || "0");
-        if (tempDisplay && !Number.isNaN(val)) {
-          tempDisplay.textContent = val;
-        }
-        if (!Number.isNaN(val)) {
-          alarmThreshold = val;
-          alarmTriggered = false;
-          checkTempAlarm();
-        }
-      });
-    }
-
-    if (tempDisplay) {
-      const tempObserver = new MutationObserver(checkTempAlarm);
-      tempObserver.observe(tempDisplay, { characterData: true, childList: true, subtree: true });
-      checkTempAlarm();
-    }
-
-    function triggerAlarm(message) {
-      if (alarmTriggered) return;
-      alarmTriggered = true;
-      document.body.classList.add("flash-alert");
-      setTimeout(() => document.body.classList.remove("flash-alert"), 1200);
-
-      const toast = document.createElement("div");
-      toast.textContent = message || "Alarm triggered";
-      toast.className = "fixed top-4 right-4 bg-rose-600 text-white px-4 py-2 rounded shadow-lg z-50";
-      document.body.appendChild(toast);
-      setTimeout(() => toast.remove(), 3000);
-    }
-
-    function checkTempAlarm() {
-      if (!tempDisplay) return;
-      const current = parseFloat(tempDisplay.textContent || "0");
-      if (Number.isNaN(current)) return;
-      if (current >= alarmThreshold && alarmThreshold > 0) {
-        triggerAlarm("High-temp alarm triggered");
-      } else {
-        alarmTriggered = false;
-      }
-    }
-
-    function toggleButton(btn, isOn, onClasses, offClasses, onText, offText) {
-      if (!btn) return;
-      btn.textContent = isOn ? onText : offText;
-      btn.className = isOn ? onClasses : offClasses;
-    }
-
-    const baseBtn = "px-4 py-2 rounded text-base text-white shadow";
-    const ignitionOnCls = `bg-amber-600 hover:bg-amber-500 ${baseBtn}`;
-    const ignitionOffCls = `bg-rose-600 hover:bg-rose-500 ${baseBtn}`;
-    const fuelOnCls = `bg-emerald-600 hover:bg-emerald-500 ${baseBtn}`;
-    const fuelOffCls = `bg-{{ accent }}-600 hover:bg-{{ accent }}-500 ${baseBtn}`;
-    const starterOnCls = `bg-emerald-600 hover:bg-emerald-500 ${baseBtn}`;
-    const starterOffCls = `bg-emerald-700 hover:bg-emerald-600 ${baseBtn}`;
-
-    if (ignitionBtn) {
-      toggleButton(ignitionBtn, ignitionOn, ignitionOnCls, ignitionOffCls, "ON", "OFF");
-      ignitionBtn.addEventListener("click", () => {
-        ignitionOn = !ignitionOn;
-        toggleButton(ignitionBtn, ignitionOn, ignitionOnCls, ignitionOffCls, "ON", "OFF");
-        if (!ignitionOn) running = false;
-        refreshStatus();
-      });
-    }
-
-    if (fuelBtn) {
-      toggleButton(fuelBtn, fuelOn, fuelOnCls, fuelOffCls, "ON", "OFF");
-      fuelBtn.addEventListener("click", () => {
-        fuelOn = !fuelOn;
-        toggleButton(fuelBtn, fuelOn, fuelOnCls, fuelOffCls, "ON", "OFF");
-        refreshStatus();
-      });
-    }
-
-    if (starterBtn) {
-      toggleButton(starterBtn, running, starterOnCls, starterOffCls, "RUNNING", "START");
-      starterBtn.addEventListener("click", () => {
-        running = !running;
-        toggleButton(starterBtn, running, starterOnCls, starterOffCls, "RUNNING", "START");
-        refreshStatus();
-      });
-    }
-
-    refreshStatus();
+    // Mark all sensors offline immediately on load — turn green only when real data arrives.
+    Object.keys(telemetryDots).forEach((key) => {
+      setDotState(key, "lost");
+      if (offlineIndicators[key]) offlineIndicators[key].classList.remove("hidden");
+    });
+    monitorTelemetry();
+    updateButtonsFromState();
+    checkTempAlarm();
+    syncLoggingState();
     setInterval(pollLogsHeartbeat, 3000);
+    setInterval(syncLoggingState, 5000);
     pollLogsHeartbeat();
   })();
 </script>

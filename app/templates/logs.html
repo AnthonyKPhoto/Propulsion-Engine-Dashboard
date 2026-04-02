@@ -3,7 +3,13 @@
 {% block title %}System Logs{% endblock %}
 {% block content %}
 <div class="max-w-6xl mx-auto mt-10">
-  <h1 class="text-3xl font-bold text-{{ accent }}-400 mb-6">System Logs</h1>
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-3xl font-bold text-{{ accent }}-400">System Logs</h1>
+    <button id="resetLogsBtn"
+      class="px-4 py-2 rounded bg-rose-700 hover:bg-rose-600 text-white font-semibold text-sm">
+      Reset All Data
+    </button>
+  </div>
   <p class="text-slate-400 mb-6">View and download recorded engine/sensor logs.</p>
 
   <!-- Export Options -->
@@ -23,8 +29,8 @@
       <canvas id="chartTemps" height="200"></canvas>
     </div>
     <div class="bg-slate-800/80 border border-slate-700 rounded-lg p-4">
-      <h3 class="text-slate-200 font-semibold mb-3">RPM & Thrust</h3>
-      <canvas id="chartRpmThrust" height="200"></canvas>
+      <h3 class="text-slate-200 font-semibold mb-3">RPM &amp; Fuel Pressure</h3>
+      <canvas id="chartRpmPressure" height="200"></canvas>
     </div>
   </div>
 
@@ -37,13 +43,12 @@
           <th class="px-4 py-2">Intake (°{{ temp_unit or 'C' }})</th>
           <th class="px-4 py-2">Exhaust (°{{ temp_unit or 'C' }})</th>
           <th class="px-4 py-2">RPM</th>
-          <th class="px-4 py-2">Thrust (N)</th>
-          <th class="px-4 py-2">Fuel Flow (kg/s)</th>
+          <th class="px-4 py-2">Fuel Pressure (PSI)</th>
           <th class="px-4 py-2">Status</th>
         </tr>
       </thead>
       <tbody id="logsBody" class="bg-slate-900 divide-y divide-slate-800">
-        <tr><td colspan="7" class="text-center text-slate-500 py-6">Loading...</td></tr>
+        <tr><td colspan="6" class="text-center text-slate-500 py-6">Loading...</td></tr>
       </tbody>
     </table>
   </div>
@@ -51,6 +56,7 @@
 
 <script>
   window.LOG_TEMP_UNIT = "{{ temp_unit or 'C' }}";
+  window.CSRF_TOKEN = "{{ csrf_token }}";
 </script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="{{ url_for('static', filename='js/logs.js') }}"></script>

@@ -9,14 +9,13 @@ import os
 from argon2 import PasswordHasher
 import ssl
 import smtplib
-from app.auth import create_temp_user
+from app.auth import create_temp_user, log_authz_event
 from flask import current_app
 
 access_bp = Blueprint("access", __name__)
 ph = PasswordHasher()
 
 
-# ---------- ACCESS REQUEST FORM ----------
 @access_bp.route('/request_access', methods=['GET', 'POST'])
 def request_access():
     site_key = os.getenv("RECAPTCHA_SITE_KEY")
@@ -62,12 +61,12 @@ def request_access():
     return render_template('request_access.html', site_key=site_key)
 
 
-# ---------- ADMIN: VIEW REQUESTS ----------
 @access_bp.route("/admin/requests")
 @login_required
 def view_requests():
     """Admin page for reviewing access requests"""
-    if current_user.role != "admin":
+    if not current_user.is_admin():
+        log_authz_event("access_requests", "denied", detail="view_requests")
         flash("Access denied.", "danger")
         return redirect(url_for("dashboard.dashboard"))
 
@@ -76,12 +75,12 @@ def view_requests():
     return render_template("admin_requests.html", pending=pending, decided=decided)
 
 
-# ---------- ADMIN: HANDLE REQUESTS ----------
 @access_bp.route("/admin/requests/<int:id>/<action>")
 @login_required
 def handle_request(id, action):
     """Approve or deny pending access requests"""
-    if current_user.role != "admin":
+    if not current_user.is_admin():
+        log_authz_event("access_requests", "denied", detail=f"handle_request:{action}")
         flash("Unauthorized.", "danger")
         return redirect(url_for("dashboard.dashboard"))
 
@@ -91,12 +90,11 @@ def handle_request(id, action):
         return redirect(url_for("access.view_requests"))
 
     if action == "approve":
-        temp_pw = create_temp_user(req.username, email=req.email, role="user", is_approved=True)
+        temp_pw = create_temp_user(req.username, email=req.email, role="viewer", is_approved=True)
         if not temp_pw:
             flash("Could not create user (maybe username exists).", "danger")
             return redirect(url_for("access.view_requests"))
 
-        # Send email
         sent, err = _send_temp_password_email(req.email, req.username, temp_pw)
         if sent:
             flash("User approved and email sent with temporary password.", "success")

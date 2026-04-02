@@ -1,5 +1,5 @@
-from flask import Blueprint, render_template, jsonify, send_file
-# Created by Anthony Kaiser
+from flask import Blueprint, render_template, jsonify, send_file, abort
+from flask_login import login_required, current_user
 import csv, io, json
 from datetime import datetime
 from sqlalchemy import text
@@ -9,6 +9,7 @@ from app import db
 bp_logs = Blueprint("logs", __name__)
 
 @bp_logs.route("/logs")
+@login_required
 def logs_page():
     return render_template("logs.html")
 
@@ -16,7 +17,7 @@ def logs_page():
 def _fetch_engine_logs(limit=None):
     """Return rows from engine_log ordered by newest first."""
     sql = """
-        SELECT timestamp, intake_temp_c, exhaust_temp_c, rpm, thrust_n, fuel_flow_kg_s, status
+        SELECT timestamp, intake_temp_c, exhaust_temp_c, rpm, fuel_pressure, status
         FROM engine_log
         ORDER BY timestamp DESC
     """
@@ -28,7 +29,6 @@ def _fetch_engine_logs(limit=None):
             result = db.session.execute(text(sql))
         return result.fetchall(), None, False
     except SQLAlchemyError as exc:
-        # Likely table missing or DB unreachable; fail gracefully.
         db.session.rollback()
         msg = str(exc)
         missing_table = "UndefinedTable" in msg or "relation \"engine_log\" does not exist" in msg
@@ -36,20 +36,12 @@ def _fetch_engine_logs(limit=None):
 
 
 @bp_logs.route("/api/logs")
+@login_required
 def api_logs():
     try:
-        rows, err, missing = _fetch_engine_logs(limit=100)
+        rows, err, missing = _fetch_engine_logs(limit=200)
         if missing:
-            sample = [{
-                "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
-                "intake_temp_c": 32.5,
-                "exhaust_temp_c": 285.0,
-                "rpm": 42000,
-                "thrust_n": 12.4,
-                "fuel_flow_kg_s": 0.14,
-                "status": "sample"
-            }]
-            return jsonify({"logs": sample, "warning": "engine_log table does not exist yet. Showing sample data."}), 200
+            return jsonify({"logs": [], "warning": "engine_log table does not exist yet. Start logging to create it."}), 200
         if err:
             return jsonify({"error": err, "logs": []}), 500
         logs = [
@@ -58,42 +50,48 @@ def api_logs():
                 "intake_temp_c": r[1],
                 "exhaust_temp_c": r[2],
                 "rpm": r[3],
-                "thrust_n": r[4],
-                "fuel_flow_kg_s": r[5],
-                "status": r[6],
+                "fuel_pressure": r[4],
+                "status": r[5],
             }
             for r in rows
         ]
         return jsonify(logs)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-        
+
+
+@bp_logs.route("/api/logs/reset", methods=["POST"])
+@login_required
+def reset_logs():
+    role = getattr(current_user, "role_key", "viewer")
+    if role != "admin":
+        return jsonify({"ok": False, "message": "Admin role required."}), 403
+    try:
+        db.session.execute(text("DELETE FROM engine_log"))
+        db.session.commit()
+        return jsonify({"ok": True, "message": "All log data cleared."})
+    except SQLAlchemyError as exc:
+        db.session.rollback()
+        return jsonify({"ok": False, "message": str(exc)}), 500
+
 
 @bp_logs.route("/download/logs/<fmt>")
 def download_logs(fmt):
     try:
         rows, err, missing = _fetch_engine_logs()
         if missing:
-            # Provide a sample download so UI isn't blocked
-            rows = [(
-                datetime.utcnow(),
-                32.5, 285.0, 42000, 12.4, 0.14, "sample"
-            )]
-            err = None
+            return jsonify({"error": "No log data yet."}), 404
         if err:
             return jsonify({"error": err}), 500
 
         if fmt == "csv":
             output = io.StringIO()
             writer = csv.writer(output)
-            writer.writerow([
-                "timestamp", "intake_temp_c", "exhaust_temp_c",
-                "rpm", "thrust_n", "fuel_flow_kg_s", "status"
-            ])
+            writer.writerow(["timestamp", "intake_temp_c", "exhaust_temp_c", "rpm", "fuel_pressure", "status"])
             for r in rows:
                 writer.writerow([
                     r[0].strftime("%Y-%m-%d %H:%M:%S") if r[0] else "",
-                    r[1], r[2], r[3], r[4], r[5], r[6]
+                    r[1], r[2], r[3], r[4], r[5]
                 ])
             output.seek(0)
             return send_file(
@@ -109,9 +107,8 @@ def download_logs(fmt):
                     "intake_temp_c": r[1],
                     "exhaust_temp_c": r[2],
                     "rpm": r[3],
-                    "thrust_n": r[4],
-                    "fuel_flow_kg_s": r[5],
-                    "status": r[6],
+                    "fuel_pressure": r[4],
+                    "status": r[5],
                 }
                 for r in rows
             ]

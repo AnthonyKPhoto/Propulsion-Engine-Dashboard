@@ -1,15 +1,13 @@
-# app/routes/settings.py
-
 from flask import (
     Blueprint, render_template, request, session,
     redirect, url_for, flash, current_app
 )
-# Created by Anthony Kaiser
 from flask_login import login_required, current_user
 
 from app import db
 from app.models.user import User
 from app.totp import generate_base32_secret, verify_totp
+from app.auth import admin_required, log_auth_event
 
 import os
 import uuid
@@ -42,7 +40,7 @@ def settings():
         qr_supported = True
         qr_error = None
         if pending_secret:
-            otp_uri = f"otpauth://totp/PropulsionDashboard:{user.username}?secret={pending_secret}&issuer=PropulsionDashboard"
+            otp_uri = f"otpauth://totp/HybridTurbojet:{user.username}?secret={pending_secret}&issuer=HybridTurbojet"
             try:
                 import qrcode  # type: ignore
                 img = qrcode.make(otp_uri)
@@ -73,18 +71,12 @@ def settings():
 
         action = request.form.get("action", "update").strip()
 
-        # -------------------------------
-        # 2FA: START SETUP
-        # -------------------------------
         if action == "start_2fa":
             secret = generate_base32_secret()
             session["pending_2fa_secret"] = secret
             flash("Scan the secret with your authenticator app, then enter a code to confirm.", "info")
             return render_settings(pending_secret_override=secret)
 
-        # -------------------------------
-        # 2FA: CONFIRM SETUP
-        # -------------------------------
         if action == "confirm_2fa":
             code_raw = (request.form.get("totp_code") or "").strip()
             code = re.sub(r"\D", "", code_raw)
@@ -102,20 +94,18 @@ def settings():
             db.session.commit()
             session.pop("pending_2fa_secret", None)
             flash("Two-factor authentication enabled.", "success")
+            log_auth_event("2fa", "enabled", user.username)
             return redirect(url_for("settings_bp.settings"))
 
-        # -------------------------------
-        # 2FA: DISABLE
-        # -------------------------------
         if action == "disable_2fa":
             user.totp_secret = None
             user.is_2fa_enabled = False
             db.session.commit()
             session.pop("pending_2fa_secret", None)
             flash("Two-factor authentication disabled.", "info")
+            log_auth_event("2fa", "disabled", user.username)
             return redirect(url_for("settings_bp.settings"))
 
-        # ---- BASIC FIELDS ----
         new_username = (request.form.get("username", user.username) or "").strip()
         raw_email = (request.form.get("email") or "").strip()
         new_email = raw_email or user.email
@@ -124,12 +114,10 @@ def settings():
         telemetry_enabled = "telemetry_enabled" in request.form
         temp_unit = request.form.get("temp_unit", user.temp_unit)
 
-        # ---- VALIDATION ----
         if not new_username:
             flash("Username cannot be empty.", "danger")
             return redirect(url_for("settings_bp.settings"))
 
-        # prevent duplicate usernames
         existing = User.query.filter(
             User.username == new_username,
             User.id != user.id
@@ -144,7 +132,6 @@ def settings():
                 flash("Please enter a valid email address.", "danger")
                 return redirect(url_for("settings_bp.settings"))
 
-        # ---- UPDATE ----
         user.username = new_username
         user.email = new_email
         user.theme = theme or "dark"
@@ -154,14 +141,13 @@ def settings():
 
         db.session.commit()
 
-        # ---- UPDATE SESSION ----
         session["username"] = user.username
         session["email"] = user.email
         session["theme"] = user.theme
         session["accent"] = user.accent
         session["temp_unit"] = user.temp_unit
 
-        # Refresh current_user attributes for this request
+        # Re-login to refresh current_user attributes for this request.
         try:
             from flask_login import login_user
             login_user(user)
@@ -169,14 +155,12 @@ def settings():
             pass
 
         flash("Settings updated successfully.", "success")
+        log_auth_event("settings_update", "success", user.username)
         return redirect(url_for("settings_bp.settings"))
 
     return render_settings()
 
 
-# -------------------------------
-# PROFILE IMAGE UPLOAD
-# -------------------------------
 @settings_bp.route("/upload_profile", methods=["POST"])
 @login_required
 def upload_profile():
@@ -203,6 +187,7 @@ def upload_profile():
         db.session.commit()
 
         flash("Profile picture updated.", "success")
+        log_auth_event("profile_image_update", "success", user.username)
         return redirect(url_for("settings_bp.settings"))
 
     flash("Invalid file type. Allowed: png, jpg, jpeg, webp.", "danger")

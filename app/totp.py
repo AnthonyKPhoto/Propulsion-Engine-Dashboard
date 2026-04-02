@@ -1,5 +1,3 @@
-# Created by Anthony Kaiser
-# Minimal TOTP utilities (no external deps)
 import base64
 import hmac
 import hashlib
