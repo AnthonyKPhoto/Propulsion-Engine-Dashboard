@@ -3,14 +3,24 @@
 {% block content %}
 <style>
 @keyframes screenFlash {
-  0%, 100% { background-color: transparent; }
-  25% { background-color: rgba(255, 87, 87, 0.2); }
-  50% { background-color: rgba(255, 157, 0, 0.2); }
+  0%, 100% { opacity: 0; }
+  25%       { opacity: 1; }
+  75%       { opacity: 1; }
 }
-.flash-alert {
-  animation: screenFlash 0.6s ease-in-out 3;
+#flash-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(255, 60, 60, 0.25);
+  pointer-events: none;
+  z-index: 9999;
+}
+#flash-overlay.flash-alert {
+  display: block;
+  animation: screenFlash 0.5s ease-in-out 4;
 }
 </style>
+<div id="flash-overlay"></div>
 <div class="space-y-8 max-w-5xl mx-auto px-4">
   <div>
     <p class="text-lg {% if theme == 'light' %}text-gray-700{% else %}text-slate-300{% endif %}">
@@ -176,6 +186,7 @@
   (function() {
     const csrfToken = "{{ csrf_token }}";
     const role = "{{ role|lower }}";
+    const tempUnit = "{{ temp_unit or 'C' }}";
     const canControl = ["admin", "operator"].includes(role);
     const isAdmin = role === "admin";
     const statusPill = document.getElementById("system-status");
@@ -489,11 +500,13 @@
     tempSetBtn?.addEventListener("click", async () => {
       const val = parseFloat(tempInput?.value || "0");
       if (Number.isNaN(val)) return;
+      // Server always stores and compares in Celsius — convert if user is in °F.
+      const valC = tempUnit === "F" ? (val - 32) * 5 / 9 : val;
       try {
         await fetch("/dashboard/api/alarm/set", {
           method: "POST",
           headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
-          body: JSON.stringify({ threshold: val }),
+          body: JSON.stringify({ threshold: valC }),
         });
       } catch (e) {}
       // Server broadcasts alarm_state to all clients; no local state change needed.
@@ -503,7 +516,9 @@
       if (uptimeDisplay) uptimeDisplay.textContent = "00:00:00";
     });
 
-    const socket = io({ transports: ["websocket"] });
+    const socket = io({ transports: ["polling", "websocket"], upgrade: true });
+    const toDisplayTemp = (c) => tempUnit === "F" ? (Number(c) * 9 / 5 + 32) : Number(c);
+
     socket.on("sensor_update", (data) => {
       const intake = data.intake_temp ?? data.intake;
       const exhaust = data.exhaust_temp ?? data.exhaust;
@@ -514,11 +529,11 @@
       // MAX6675: ~1023.75 means open-circuit fault — treat as offline. 0 is a valid reading.
       const intakeValid = intake != null && Number(intake) < 1023;
       const exhaustValid = exhaust != null && Number(exhaust) < 1023;
-      if (updateTelemetryValue("Intake", intakeValid ? intake : "--", (v) => v === "--" ? "--" : parseNumber(v, 1))) { if (intakeValid) markTelemetryUpdate("Intake"); }
-      if (updateTelemetryValue("Exhaust", exhaustValid ? exhaust : "--", (v) => v === "--" ? "--" : parseNumber(v, 1))) { if (exhaustValid) markTelemetryUpdate("Exhaust"); }
+      if (updateTelemetryValue("Intake", intakeValid ? toDisplayTemp(intake) : "--", (v) => v === "--" ? "--" : parseNumber(v, 1))) { if (intakeValid) markTelemetryUpdate("Intake"); }
+      if (updateTelemetryValue("Exhaust", exhaustValid ? toDisplayTemp(exhaust) : "--", (v) => v === "--" ? "--" : parseNumber(v, 1))) { if (exhaustValid) markTelemetryUpdate("Exhaust"); }
       if (updateTelemetryValue("Fuel-Pressure", pressure, (v) => parseNumber(v, 1)) && pressure != null) markTelemetryUpdate("Fuel-Pressure");
       if (updateTelemetryValue("Axle-RPM", rpm, (v) => Math.round(Number(v)).toString())) markTelemetryUpdate("Axle-RPM");
-      if (updateTelemetryValue("temperature", temp, (v) => parseNumber(v, 1))) checkTempAlarm();
+      if (updateTelemetryValue("temperature", temp != null ? toDisplayTemp(temp) : null, (v) => parseNumber(v, 1))) checkTempAlarm();
     });
     socket.on("control_state_update", (state) => {
       controlState = state || controlState;
@@ -544,10 +559,20 @@
       const wasTriggered = alarmTriggered;
       alarmThreshold = typeof data.threshold === "number" ? data.threshold : 0;
       alarmTriggered = !!data.triggered;
-      if (tempInput) tempInput.value = alarmThreshold;
+      // Threshold is stored in °C — show in user's unit in the input.
+      if (tempInput) tempInput.value = alarmThreshold > 0
+        ? parseNumber(toDisplayTemp(alarmThreshold), 1)
+        : 0;
+      // Update the Current temperature display from server's latest value.
+      if (typeof data.latest_temp === "number" && data.latest_temp !== 0) {
+        updateTelemetryValue("temperature", toDisplayTemp(data.latest_temp), (v) => parseNumber(v, 1));
+      }
       if (alarmTriggered && !wasTriggered) {
-        document.body.classList.add("flash-alert");
-        setTimeout(() => document.body.classList.remove("flash-alert"), 1200);
+        const flashEl = document.getElementById("flash-overlay");
+        if (flashEl) {
+          flashEl.classList.add("flash-alert");
+          setTimeout(() => flashEl.classList.remove("flash-alert"), 2000);
+        }
         showToast("High-temp alarm triggered!", "danger");
       }
       checkTempAlarm();

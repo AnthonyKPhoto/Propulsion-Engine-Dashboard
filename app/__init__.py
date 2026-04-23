@@ -42,13 +42,14 @@ def create_app():
     app.config["SESSION_PERMANENT"] = True
     session_timeout_seconds = int(os.getenv("SESSION_TIMEOUT_SECONDS", "3600"))
     app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(seconds=session_timeout_seconds)
+    https = os.getenv("HTTPS_ENABLED", "0") == "1"
     app.config.update(
-        PREFERRED_URL_SCHEME="https",
-        SESSION_COOKIE_SECURE=True,
+        PREFERRED_URL_SCHEME="https" if https else "http",
+        SESSION_COOKIE_SECURE=https,
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
         SESSION_REFRESH_EACH_REQUEST=True,
-        REMEMBER_COOKIE_SECURE=True,
+        REMEMBER_COOKIE_SECURE=https,
         REMEMBER_COOKIE_HTTPONLY=True,
         REMEMBER_COOKIE_SAMESITE="Lax",
     )
@@ -144,7 +145,7 @@ def create_app():
             "https://cdn.socket.io; "
             "style-src 'self' 'unsafe-inline'; "
             "frame-src https://www.google.com; "
-            "connect-src 'self';"
+            "connect-src 'self' ws: wss:;"
         )
         response.headers["Content-Security-Policy"] = csp
         response.headers["X-Content-Type-Options"] = "nosniff"
